@@ -26,13 +26,15 @@
 | P0 | Simple file upload (< 10MB) | Low | ⬜ Not Started |
 | P0 | File metadata storage | Low | ⬜ Not Started |
 | P0 | S3 Glacier Deep Archive provider | Medium | ⬜ Not Started |
-| P0 | Basic authentication (OAuth2) | Medium | ⬜ Not Started |
+| P0 | S3 Glacier Flexible Retrieval provider | Low | ⬜ Not Started |
+| P0 | Simple API Key authentication (local dev) | Low | ⬜ Not Started |
 | P0 | File retrieval from Glacier | Medium | ⬜ Not Started |
+| P0 | Plugin interface for custom providers | Low | ⬜ Not Started |
+| P1 | OAuth2 authentication (production) | Medium | ⬜ Not Started |
 | P1 | Chunked/resumable upload | Medium | ⬜ Not Started |
 | P1 | Thumbnail generation & caching | Medium | ⬜ Not Started |
 | P1 | Hash-based deduplication | Medium | ⬜ Not Started |
 | P1 | Batch hash comparison API | Low | ⬜ Not Started |
-| P1 | S3 Glacier Flexible Retrieval provider | Low | ⬜ Not Started |
 | P1 | Backblaze B2 provider | Medium | ⬜ Not Started |
 | P2 | 3-tier rate limiting | Medium | ⬜ Not Started |
 | P2 | Quota management (multi-provider) | High | ⬜ Not Started |
@@ -91,20 +93,47 @@
   - Region
   - Storage class: DEEP_ARCHIVE
 
-#### 1.4 Basic OAuth2 Authentication
-- **Grant Types:**
-  - Authorization Code (for initial login)
-  - Refresh Token (for silent refresh)
-- **Token Management:**
-  - Access token (1 hour expiry)
-  - Refresh token (90 days expiry)
-  - Token rotation on refresh
-- **Endpoints:**
-  - `POST /auth/token` - Get tokens
-  - `POST /auth/refresh` - Refresh access token
-  - `POST /auth/revoke` - Logout
+#### 1.4 S3 Glacier Flexible Retrieval Provider
+- **Operations:**
+  - Upload file to S3 Glacier Flexible Retrieval
+  - Faster retrieval than Deep Archive (3-5 hours vs 12-48 hours)
+  - Higher cost but better for occasionally accessed files
+- **Configuration:**
+  - Same as Deep Archive but with GLACIER_IR storage class
+  - Gives users real choice from day one
 
-#### 1.5 File Retrieval (Glacier)
+#### 1.5 Simple API Key Authentication (Local Development)
+- **Purpose:** Easy local testing without OAuth2 complexity
+- **How it works:**
+  - Generate API key for each user (GUID or random string)
+  - Store in appsettings.json or environment variable for development
+  - Send via `X-API-Key` header or `Authorization: ApiKey {key}`
+  - Simple validation in middleware
+- **Endpoints:**
+  - `POST /auth/apikey` - Generate new API key (admin only)
+  - `GET /auth/validate` - Validate API key
+- **Note:** OAuth2 will be added in Phase 2 for production use
+- **For Production:** Use environment variable or secrets manager
+
+**Example Usage:**
+```bash
+# Local development
+curl -H "X-API-Key: dev-user-123" \
+  -F "file=@photo.jpg" \
+  http://localhost:5000/api/v1/files
+```
+
+#### 1.6 Plugin Interface for Custom Providers
+- **IStorageProvider Interface:** Define in Domain Layer (available from Phase 1)
+- **Purpose:** Allow others to implement their own storage providers
+- **Requirements:**
+  - Implement `IStorageProvider` interface
+  - Place DLL in `/plugins` directory
+  - Configure in appsettings.json
+- **Examples:** Cloudflare R2, Wasabi, Google Cloud Storage, custom S3-compatible storage
+- **Documentation:** See PLUGIN_DEVELOPMENT.md for detailed guide
+
+#### 1.7 File Retrieval (Glacier)
 - **Endpoint:** `POST /files/{fileId}/retrieve`
 - **Retrieval Tiers:**
   - Bulk: 5-12 hours (cheapest)
@@ -116,7 +145,7 @@
   - Get download URL when ready
   - Auto-expire download URL after 24 hours
 
-#### 1.6 Get File Metadata
+#### 1.8 Get File Metadata
 - **Endpoint:** `GET /files/{fileId}`
 - **Response:**
   - All file metadata
@@ -128,13 +157,35 @@
 
 ## Phase 2: Essential Features
 
-**Goal:** Support large files, multiple providers, efficiency
+**Goal:** Support large files, production auth, efficiency features
 **Timeline:** Week 3-4
 **Dependencies:** Phase 1 complete
 
 ### Features
 
-#### 2.1 Chunked/Resumable Upload
+#### 2.1 OAuth2 Authentication (Production)
+- **Purpose:** Secure authentication for production deployment
+- **Grant Types:**
+  - Authorization Code (for initial login)
+  - Refresh Token (for silent refresh)
+- **Token Management:**
+  - Access token (1 hour expiry)
+  - Refresh token (90 days expiry)
+  - Token rotation on refresh for security
+- **Supported Providers:**
+  - Google OAuth2
+  - Apple Sign In
+  - Email/Password (via IdentityServer or Auth0)
+- **Endpoints:**
+  - `POST /auth/token` - Get tokens
+  - `POST /auth/refresh` - Refresh access token
+  - `POST /auth/revoke` - Logout
+- **Mobile App Flow:**
+  - OAuth redirect to `flexstorage://oauth/callback`
+  - Automatic token refresh in background
+  - Biometric lock on app side
+
+#### 2.2 Chunked/Resumable Upload
 - **Endpoint:** `POST /files/upload/initiate`
 - **Chunk Size:** 5MB (configurable)
 - **Flow:**
@@ -149,23 +200,25 @@
   - Track upload progress
   - Support files up to 5GB
 
-#### 2.2 Thumbnail Generation & Caching
-- **Trigger:** Automatic on file upload (before Glacier archival)
+#### 2.3 Thumbnail Generation & Caching
+- **Trigger:** Asynchronous after file upload completes (job queue)
 - **Image Thumbnails:**
   - Small: 150x150px
   - Medium: 300x300px
   - Large: 600x600px
-  - Format: JPEG, quality 85%
+  - Format: WebP for smaller file sizes, quality 85%
 - **Video Thumbnails:**
   - 3 preview frames (at 25%, 50%, 75% of duration)
   - 10-second preview clip (first 10s, compressed)
-- **Storage:**
-  - S3 Standard (NOT Glacier) for instant access
-  - CDN integration (CloudFront)
+- **Strategy:**
+  - Use job queues (Hangfire or AWS Lambda)
+  - Support lazy generation (generate on first request, then cache)
+  - Store thumbnails in S3 Standard (NOT Glacier) for instant access
+  - CDN integration (CloudFront) for fast delivery
 - **Endpoint:** `GET /files/{fileId}/thumbnail?size=medium`
 - **Permanence:** Thumbnails never expire
 
-#### 2.3 Hash-Based Deduplication
+#### 2.4 Hash-Based Deduplication
 - **Process:**
   1. Client calculates SHA256 hash before upload
   2. Send hash in initiate upload request
@@ -182,7 +235,7 @@
   - Save storage costs
   - Faster "upload" experience
 
-#### 2.4 Batch Hash Comparison API
+#### 2.5 Batch Hash Comparison API
 - **Endpoint:** `POST /files/compare-hashes`
 - **Input:** Array of up to 1000 hashes + filenames
 - **Output:** For each hash:
@@ -192,18 +245,20 @@
   - Safe to delete locally: true/false
 - **Use Case:** Mobile app can safely delete local files after confirming upload
 
-#### 2.5 Additional Storage Providers
-- **S3 Glacier Flexible Retrieval:**
-  - Faster retrieval (3-5 hours standard)
-  - Higher cost than Deep Archive
-  - Good for occasionally accessed files
-- **Backblaze B2:**
-  - Instant access (no retrieval delay)
+#### 2.6 Backblaze B2 Provider
+- **Purpose:** Instant access storage (no retrieval delay like Glacier)
+- **Operations:**
+  - Upload file to Backblaze B2
+  - Download file instantly (no retrieval wait)
+  - Delete file
+  - Authentication via API key
+- **Benefits:**
   - Competitive pricing
   - Good for frequently accessed files
   - Free API calls
+  - No egress fees for first 3x storage
 
-#### 2.6 Sync Status Endpoint
+#### 2.7 Sync Status Endpoint
 - **Endpoint:** `GET /files/sync-status?since=2025-10-20T00:00:00Z`
 - **Purpose:** Mobile app periodic sync
 - **Response:**

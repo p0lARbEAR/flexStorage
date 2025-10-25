@@ -16,6 +16,12 @@
 4. **API Layer** (Depends on all layers)
 5. **Integration Tests** (End-to-end flows)
 
+**Note:** This test plan is organized by **DDD layers** (inside-out testing), which differs from the **feature phases** in BACKEND_SPEC.md. For example:
+- **Phase 1 (MVP)** includes: Simple upload, S3 Glacier Deep + Flexible providers, API Key auth, file retrieval, plugin interface
+- Tests for these features span multiple phases here: Domain (Phase 1-3), Application (Phase 5), Infrastructure (Phase 8-9), API (Phase 11)
+
+Follow this test plan's order for TDD implementation - it ensures solid foundations (Domain) before building on top (Infrastructure, API).
+
 ### TDD Cycle
 ```
 RED → GREEN → REFACTOR
@@ -691,6 +697,17 @@ Write failing test → Make it pass → Improve code
 **Estimated Tests:** 70-80 test cases
 
 ### 11.1 AuthController
+
+**API Key Authentication (Phase 1 - Local Development):**
+- ⬜ Should validate API key from X-API-Key header
+- ⬜ Should validate API key from Authorization header
+- ⬜ Should return 401 for missing API key
+- ⬜ Should return 401 for invalid API key
+- ⬜ Should extract user ID from valid API key
+- ⬜ Should generate new API key (admin endpoint)
+- ⬜ Should validate API key endpoint returns success
+
+**OAuth2 Authentication (Phase 2 - Production):**
 - ⬜ Should return access token for valid authorization code
 - ⬜ Should return refresh token for valid authorization code
 - ⬜ Should return 401 for invalid authorization code
@@ -698,9 +715,11 @@ Write failing test → Make it pass → Improve code
 - ⬜ Should return 401 for invalid refresh token
 - ⬜ Should revoke tokens on logout
 - ⬜ Should return proper token expiration times
+- ⬜ Should rotate refresh token on refresh
+- ⬜ Should support multiple OAuth providers (Google, Apple)
 
 **Test Class:** `AuthControllerTests.cs`
-**Dependencies:** OAuth2 service (mock)
+**Dependencies:** API Key service, OAuth2 service (mock)
 
 ---
 
