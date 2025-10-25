@@ -16,9 +16,9 @@
 4. **API Layer** (Depends on all layers)
 5. **Integration Tests** (End-to-end flows)
 
-**Note:** This test plan is organized by **DDD layers** (inside-out testing), which differs from the **feature phases** in BACKEND_SPEC.md. For example:
-- **Phase 1 (MVP)** includes: Simple upload, S3 Glacier Deep + Flexible providers, API Key auth, file retrieval, plugin interface
-- Tests for these features span multiple phases here: Domain (Phase 1-3), Application (Phase 5), Infrastructure (Phase 8-9), API (Phase 11)
+**Note:** This test plan is organized by **DDD layers** (inside-out testing), which differs from the **feature phases (P0-P4)** in BACKEND_SPEC.md. For example:
+- **Feature Phase P0 (MVP)** in BACKEND_SPEC includes: Simple upload, S3 Glacier Deep + Flexible providers, API Key auth, file retrieval, plugin interface
+- Tests for these MVP features span multiple test groups here: Domain (Groups 1-3), Application (Group 5), Infrastructure (Groups 8-9), API (Group 11)
 
 Follow this test plan's order for TDD implementation - it ensures solid foundations (Domain) before building on top (Infrastructure, API).
 
@@ -35,15 +35,15 @@ Write failing test → Make it pass → Improve code
 ### Overall Test Status
 - **Total Tests Written:** 96 tests
 - **Tests Passing:** 96 tests
-- **Coverage:** Domain Layer (100%), Application Layer (Phase 1 MVP complete)
+- **Coverage:** Domain Layer (100%), Application Layer (MVP services complete)
 
-### Phase Completion
-- ✅ **Phase 1:** Domain Layer - Value Objects (51 tests)
-- ✅ **Phase 2:** Domain Layer - Entities (37 tests)
-- 🔄 **Phase 3:** Domain Layer - Domain Services (8 tests, FileHashCalculator deferred to IHashService)
-- ✅ **Phase 4:** Application Layer - Repository Interfaces (Defined)
-- 🔄 **Phase 5:** Application Layer - Application Services (22 tests - MVP complete)
-- ⬜ **Phase 6-12:** Not started
+### Test Group Completion
+- ✅ **Group 1:** Domain Layer - Value Objects (51 tests)
+- ✅ **Group 2:** Domain Layer - Entities (37 tests)
+- 🔄 **Group 3:** Domain Layer - Domain Services (8 tests, FileHashCalculator deferred to IHashService)
+- ✅ **Group 4:** Application Layer - Repository Interfaces (Defined)
+- 🔄 **Group 5:** Application Layer - Application Services (22 tests - MVP complete)
+- ⬜ **Groups 6-12:** Not started
 
 ### Latest Commits
 1. Application Layer interfaces (repositories and services)
@@ -52,9 +52,9 @@ Write failing test → Make it pass → Improve code
 4. FileRetrievalService with TDD (6 tests) + domain enhancements
 
 ### Next Steps
-- Phase 6: Rate Limiting & Quota services
-- Phase 8: Infrastructure Layer (S3 Glacier providers, EF Core repositories)
-- Phase 11: API Layer (Controllers, authentication)
+- Group 6: Rate Limiting & Quota services
+- Group 8: Infrastructure Layer (S3 Glacier providers, EF Core repositories)
+- Group 11: API Layer (Controllers, authentication)
 
 ---
 
@@ -69,7 +69,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 1: Domain Layer - Value Objects ✅
+## Test Group 1: Domain Layer - Value Objects ✅
 
 **Goal:** Build foundation with no dependencies
 **Estimated Tests:** 35-40 test cases
@@ -145,7 +145,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 2: Domain Layer - Entities ✅
+## Test Group 2: Domain Layer - Entities ✅
 
 **Goal:** Core business entities
 **Estimated Tests:** 30-35 test cases
@@ -195,7 +195,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 3: Domain Layer - Domain Services 🔄
+## Test Group 3: Domain Layer - Domain Services 🔄
 
 **Goal:** Business logic that doesn't belong to single entity
 **Estimated Tests:** 25-30 test cases
@@ -247,7 +247,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 4: Application Layer - Repository Interfaces ✅
+## Test Group 4: Application Layer - Repository Interfaces ✅
 
 **Goal:** Define data access contracts
 **Estimated Tests:** 15-20 test cases
@@ -282,11 +282,11 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 5: Application Layer - Application Services 🔄
+## Test Group 5: Application Layer - Application Services 🔄
 
 **Goal:** Use cases and orchestration
 **Estimated Tests:** 60-70 test cases
-**Status:** 🔄 Partially Complete (22 tests passing - Phase 1 MVP services complete)
+**Status:** 🔄 Partially Complete (22 tests passing - Feature Phase P0 MVP services complete)
 
 ### 5.1 FileUploadService (Simple Upload) ✅
 - ✅ Should validate file size before upload
@@ -420,7 +420,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 6: Application Layer - Rate Limiting & Quota
+## Test Group 6: Application Layer - Rate Limiting & Quota
 
 **Estimated Tests:** 30-35 test cases
 
@@ -470,7 +470,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 7: Application Layer - Advanced Features
+## Test Group 7: Application Layer - Advanced Features
 
 **Estimated Tests:** 40-50 test cases
 
@@ -566,7 +566,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 8: Infrastructure Layer - Storage Providers
+## Test Group 8: Infrastructure Layer - Storage Providers
 
 **Estimated Tests:** 50-60 test cases
 
@@ -642,7 +642,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 9: Infrastructure Layer - Persistence
+## Test Group 9: Infrastructure Layer - Persistence
 
 **Estimated Tests:** 40-45 test cases
 
@@ -688,7 +688,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 10: Infrastructure Layer - Background Jobs
+## Test Group 10: Infrastructure Layer - Background Jobs
 
 **Estimated Tests:** 20-25 test cases
 
@@ -730,7 +730,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 11: API Layer - Controllers
+## Test Group 11: API Layer - Controllers
 
 **Estimated Tests:** 70-80 test cases
 
@@ -900,7 +900,7 @@ Write failing test → Make it pass → Improve code
 
 ---
 
-## Phase 12: Integration Tests
+## Test Group 12: Integration Tests
 
 **Goal:** End-to-end flows across all layers
 **Estimated Tests:** 30-35 test cases
@@ -1014,10 +1014,10 @@ public class FileBuilder
 ## Next Steps
 
 1. ✅ Review and approve this test plan
-2. ⬜ Setup project structure (.NET 8 solution)
-3. ⬜ Configure xUnit and FluentAssertions
-4. ⬜ Start Phase 1: Domain Layer Value Objects
-5. ⬜ Follow TDD cycle: Red → Green → Refactor
+2. ✅ Setup project structure (.NET 8 solution)
+3. ✅ Configure xUnit and FluentAssertions
+4. ✅ Complete Test Group 1: Domain Layer Value Objects
+5. ✅ Follow TDD cycle: Red → Green → Refactor
 
 **Ready to start coding?** Let me know when to proceed!
 
