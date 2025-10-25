@@ -3,6 +3,7 @@ using FlexStorage.Domain.Entities;
 using FlexStorage.Domain.ValueObjects;
 using FlexStorage.Domain.DomainEvents;
 using Xunit;
+using File = FlexStorage.Domain.Entities.File;
 
 namespace FlexStorage.Domain.Tests.Entities;
 
