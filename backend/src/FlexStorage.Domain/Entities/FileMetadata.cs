@@ -7,7 +7,7 @@ namespace FlexStorage.Domain.Entities;
 /// </summary>
 public class FileMetadata
 {
-    private static readonly Regex InvalidFileCharsRegex = new(@"[<>:""/\\|?*\x00-\x1F]", RegexOptions.Compiled);
+    private static readonly Regex InvalidFileCharsRegex = new(@"[<>:""/\\|?*\(\)\x00-\x1F]", RegexOptions.Compiled);
     private readonly HashSet<string> _tags = new();
 
     /// <summary>
