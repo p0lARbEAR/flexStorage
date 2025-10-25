@@ -11,6 +11,11 @@ public interface IUnitOfWork : IDisposable
     IFileRepository Files { get; }
 
     /// <summary>
+    /// Gets the upload session repository.
+    /// </summary>
+    IUploadSessionRepository UploadSessions { get; }
+
+    /// <summary>
     /// Saves all changes to the database.
     /// </summary>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
