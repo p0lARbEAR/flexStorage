@@ -58,7 +58,7 @@ public interface IStorageProvider
     /// <param name="retrievalId">The retrieval job ID</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Current retrieval status</returns>
-    Task<RetrievalStatus> GetRetrievalStatusAsync(
+    Task<RetrievalStatusDetail> GetRetrievalStatusAsync(
         string retrievalId,
         CancellationToken cancellationToken);
 
@@ -101,6 +101,16 @@ public class ProviderCapabilities
     public bool SupportsDeletion { get; init; }
 
     /// <summary>
+    /// Whether this provider supports deep archive storage (lowest cost, slowest retrieval).
+    /// </summary>
+    public bool SupportsDeepArchive { get; init; }
+
+    /// <summary>
+    /// Whether this provider supports flexible retrieval storage (moderate cost and retrieval time).
+    /// </summary>
+    public bool SupportsFlexibleRetrieval { get; init; }
+
+    /// <summary>
     /// Minimum retrieval time (for cold storage).
     /// </summary>
     public TimeSpan MinRetrievalTime { get; init; }
@@ -127,6 +137,11 @@ public class UploadOptions
     public string? ContentType { get; init; }
 
     /// <summary>
+    /// Preferred storage provider name (optional).
+    /// </summary>
+    public string? PreferredProvider { get; init; }
+
+    /// <summary>
     /// Additional metadata to store with the file.
     /// </summary>
     public Dictionary<string, string>? Metadata { get; init; }
@@ -138,14 +153,24 @@ public class UploadOptions
 public class UploadResult
 {
     /// <summary>
-    /// Where the file was stored.
+    /// Whether the upload succeeded.
     /// </summary>
-    public required StorageLocation Location { get; init; }
+    public bool Success { get; init; }
+
+    /// <summary>
+    /// Where the file was stored (null if failed).
+    /// </summary>
+    public StorageLocation? Location { get; init; }
 
     /// <summary>
     /// When the upload completed.
     /// </summary>
     public DateTime UploadedAt { get; init; }
+
+    /// <summary>
+    /// Error message if upload failed.
+    /// </summary>
+    public string? ErrorMessage { get; init; }
 }
 
 /// <summary>
@@ -175,9 +200,14 @@ public enum RetrievalTier
 public class RetrievalResult
 {
     /// <summary>
-    /// The unique ID of this retrieval job.
+    /// Whether the retrieval initiation succeeded.
     /// </summary>
-    public required string RetrievalId { get; init; }
+    public bool Success { get; init; }
+
+    /// <summary>
+    /// The unique ID of this retrieval job (null if failed).
+    /// </summary>
+    public string? RetrievalId { get; init; }
 
     /// <summary>
     /// Estimated time until retrieval completes.
@@ -188,6 +218,11 @@ public class RetrievalResult
     /// Current status of the retrieval.
     /// </summary>
     public RetrievalStatus Status { get; init; }
+
+    /// <summary>
+    /// Error message if initiation failed.
+    /// </summary>
+    public string? ErrorMessage { get; init; }
 }
 
 /// <summary>
@@ -219,6 +254,37 @@ public enum RetrievalStatus
     /// Retrieval failed.
     /// </summary>
     Failed
+}
+
+/// <summary>
+/// Detailed status of a retrieval request.
+/// </summary>
+public class RetrievalStatusDetail
+{
+    /// <summary>
+    /// The retrieval job ID.
+    /// </summary>
+    public required string RetrievalId { get; init; }
+
+    /// <summary>
+    /// Current status.
+    /// </summary>
+    public RetrievalStatus Status { get; init; }
+
+    /// <summary>
+    /// Progress percentage (0-100).
+    /// </summary>
+    public int ProgressPercentage { get; init; }
+
+    /// <summary>
+    /// When the retrieval completed (if status is Ready).
+    /// </summary>
+    public DateTime? CompletedAt { get; init; }
+
+    /// <summary>
+    /// Error message if status is Failed.
+    /// </summary>
+    public string? ErrorMessage { get; init; }
 }
 
 /// <summary>
