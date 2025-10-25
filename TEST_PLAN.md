@@ -58,6 +58,79 @@ Write failing test → Make it pass → Improve code
 
 ---
 
+## Feature Phase Progress (BACKEND_SPEC.md)
+
+This section maps **Test Group** completion to actual **Feature Phases** from BACKEND_SPEC.md, showing which production features are ready.
+
+### Feature Phase P0 (MVP) - Core Upload & Storage 🔄
+**Status:** 60% Complete (Domain/Application layers done, need Infrastructure/API)
+
+**Required Test Groups:**
+- ✅ Group 1: Domain Layer - Value Objects (Foundation)
+- ✅ Group 2: Domain Layer - Entities (File, FileMetadata)
+- ✅ Group 3: Domain Layer - Domain Services (IStorageProvider interface)
+- ✅ Group 4: Application Layer - Repository Interfaces
+- ✅ Group 5: Application Services (FileUploadService, ChunkedUploadService, FileRetrievalService)
+- ⬜ Group 8.1: S3 Glacier Deep Archive Provider
+- ⬜ Group 8.2: S3 Glacier Flexible Retrieval Provider
+- ⬜ Group 8.4: Plugin Loader
+- ⬜ Group 9.1: FileRepository (EF Core)
+- ⬜ Group 11.1: AuthController (API Key auth)
+- ⬜ Group 11.2: FilesController (Upload)
+- ⬜ Group 11.4: FilesController (Retrieval)
+
+**MVP Features Covered:**
+- ✅ Simple file upload (domain/application logic)
+- ✅ File metadata storage (domain models)
+- ⬜ S3 Glacier Deep Archive provider (needs infrastructure)
+- ⬜ S3 Glacier Flexible Retrieval provider (needs infrastructure)
+- ⬜ Simple API Key authentication (needs API layer)
+- ✅ File retrieval from Glacier (application logic)
+- ✅ Plugin interface for custom providers (IStorageProvider defined)
+
+### Feature Phase P1 - Essential Features ⬜
+**Status:** 15% Complete (Deduplication logic done, OAuth2/Thumbnails/Backblaze not started)
+
+**Required Test Groups:**
+- ⬜ Group 11.1: AuthController (OAuth2)
+- ✅ Group 5.2: ChunkedUploadService (resumable uploads)
+- ⬜ Group 5.4: ThumbnailGenerationService
+- ✅ Group 5.1: FileUploadService (hash-based deduplication)
+- ⬜ Group 5.5: HashComparisonService (batch hash API)
+- ⬜ Group 8.3: Backblaze B2 Provider
+
+**P1 Features Covered:**
+- ⬜ OAuth2 authentication
+- ✅ Chunked/resumable upload (application logic)
+- ⬜ Thumbnail generation & caching
+- ✅ Hash-based deduplication (application logic)
+- ⬜ Batch hash comparison API
+- ⬜ Backblaze B2 provider
+
+### Feature Phase P2 - Production Ready ⬜
+**Status:** 0% Complete
+
+**Required Test Groups:**
+- ⬜ Group 6.1: RateLimitingService
+- ⬜ Group 6.2: QuotaManagementService
+- ⬜ Group 7.3: FileSearchService
+- ⬜ Group 8.4: PluginLoader (enhanced)
+- ⬜ Group 11.4: FilesController (Range download)
+
+### Feature Phase P3 - Advanced Features ⬜
+**Status:** 0% Complete
+
+**Required Test Groups:**
+- ⬜ Group 7.1: RedundancyManagementService
+- ⬜ Group 7.2: FileRebalancingService
+- ⬜ Group 7.4: FileSharingService
+- ⬜ Group 11.9: ShareController (webhooks)
+
+### Feature Phase P4 - Nice-to-Have ⬜
+**Status:** 0% Complete (Future enhancement)
+
+---
+
 ## Test Execution Checklist
 
 ### Legend
