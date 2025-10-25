@@ -32,7 +32,7 @@ public class FileMetadataTests
     public void Should_ValidateFilename_IsNotNullOrEmpty(string? filename)
     {
         // Act
-        Action act = () => FileMetadata.Create(filename!, "hash", DateTime.UtcNow);
+        Action act = () => FileMetadata.Create(filename!, "sha256:abc123", DateTime.UtcNow);
 
         // Assert
         act.Should().Throw<ArgumentException>()
@@ -46,7 +46,7 @@ public class FileMetadataTests
         var originalFilename = "My<>Photo|File?.jpg";
 
         // Act
-        var metadata = FileMetadata.Create(originalFilename, "hash", DateTime.UtcNow);
+        var metadata = FileMetadata.Create(originalFilename, "sha256:abc123", DateTime.UtcNow);
 
         // Assert
         metadata.SanitizedFileName.Should().NotContain("<");
@@ -63,7 +63,7 @@ public class FileMetadataTests
         var originalFilename = "My Photo (2024).jpg";
 
         // Act
-        var metadata = FileMetadata.Create(originalFilename, "hash", DateTime.UtcNow);
+        var metadata = FileMetadata.Create(originalFilename, "sha256:abc123", DateTime.UtcNow);
 
         // Assert
         metadata.OriginalFileName.Should().Be(originalFilename);
