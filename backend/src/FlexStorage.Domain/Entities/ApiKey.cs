@@ -48,7 +48,12 @@ public class ApiKey
     public string? Description { get; private set; }
 
     // EF Core constructor
-    private ApiKey() { }
+    private ApiKey() 
+    {
+        Id = null!;
+        UserId = null!;
+        KeyHash = null!;
+    }
 
     private ApiKey(
         ApiKeyId id,
