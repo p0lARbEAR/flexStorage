@@ -210,17 +210,45 @@ public class FileRepositoryTests : IDisposable
         deleted.Should().BeNull();
     }
 
+    [Fact]
+    public async Task SearchAsync_WithFileName_ShouldFilterResults()
+    {
+        // Arrange - RED: Write test first
+        var userId = UserId.New();
+        var file1 = CreateTestFile(userId: userId, fileName: "vacation-photo.jpg");
+        var file2 = CreateTestFile(userId: userId, fileName: "birthday-party.jpg");
+        var file3 = CreateTestFile(userId: userId, fileName: "work-document.pdf");
+
+        await _context.Files.AddRangeAsync(file1, file2, file3);
+        await _context.SaveChangesAsync();
+
+        var criteria = new FlexStorage.Application.Interfaces.Repositories.FileSearchCriteria
+        {
+            UserId = userId,
+            FileName = "photo"  // Should match "vacation-photo.jpg"
+        };
+
+        // Act
+        var result = await _sut.SearchAsync(criteria);
+
+        // Assert - This test should PASS (GREEN) because implementation exists
+        result.Items.Should().HaveCount(1);
+        result.Items.First().Metadata.OriginalFileName.Should().Contain("photo");
+    }
+
     private File CreateTestFile(
         UserId? userId = null,
         string? hash = null,
-        string? mimeType = null)
+        string? mimeType = null,
+        string? fileName = null)
     {
         var effectiveUserId = userId ?? UserId.New();
         var effectiveHash = hash ?? $"sha256:{Guid.NewGuid():N}";
         var effectiveMimeType = mimeType ?? "image/jpeg";
+        var effectiveFileName = fileName ?? "test-file.jpg";
 
         var metadata = FileMetadata.Create(
-            "test-file.jpg",
+            effectiveFileName,
             effectiveHash,
             DateTime.UtcNow);
 
