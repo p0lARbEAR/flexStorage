@@ -269,6 +269,37 @@ public class FileRepositoryTests : IDisposable
         result.Items.Should().NotContain(f => f.Metadata.OriginalFileName == "old-file.jpg");
     }
 
+    [Fact]
+    public async Task SearchAsync_WithMultipleFilters_ShouldCombineFilters()
+    {
+        // Arrange - RED: Test combining multiple filters
+        var userId = UserId.New();
+        var recentDate = DateTime.UtcNow.AddDays(-5);
+
+        var file1 = CreateTestFile(userId: userId, fileName: "vacation-photo.jpg", mimeType: "image/jpeg", capturedAt: recentDate);
+        var file2 = CreateTestFile(userId: userId, fileName: "vacation-video.mp4", mimeType: "video/mp4", capturedAt: recentDate);
+        var file3 = CreateTestFile(userId: userId, fileName: "old-photo.jpg", mimeType: "image/jpeg", capturedAt: DateTime.UtcNow.AddDays(-30));
+
+        await _context.Files.AddRangeAsync(file1, file2, file3);
+        await _context.SaveChangesAsync();
+
+        var criteria = new FlexStorage.Application.Interfaces.Repositories.FileSearchCriteria
+        {
+            UserId = userId,
+            FileName = "vacation",  // Match "vacation" files
+            Category = FileCategory.Photo,  // Only photos
+            FromDate = DateTime.UtcNow.AddDays(-10)  // Last 10 days
+        };
+
+        // Act
+        var result = await _sut.SearchAsync(criteria);
+
+        // Assert - Should only find vacation-photo.jpg (matches all 3 filters)
+        result.Items.Should().HaveCount(1);
+        result.Items.First().Metadata.OriginalFileName.Should().Be("vacation-photo.jpg");
+        result.Items.First().Type.Category.Should().Be(FileCategory.Photo);
+    }
+
     private File CreateTestFile(
         UserId? userId = null,
         string? hash = null,
