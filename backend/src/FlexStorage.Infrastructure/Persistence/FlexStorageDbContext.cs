@@ -17,6 +17,7 @@ public class FlexStorageDbContext : DbContext
 
     public DbSet<File> Files => Set<File>();
     public DbSet<UploadSession> UploadSessions => Set<UploadSession>();
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -24,6 +25,7 @@ public class FlexStorageDbContext : DbContext
 
         ConfigureFileEntity(modelBuilder);
         ConfigureUploadSessionEntity(modelBuilder);
+        ConfigureApiKeyEntity(modelBuilder);
     }
 
     private void ConfigureFileEntity(ModelBuilder modelBuilder)
@@ -215,6 +217,53 @@ public class FlexStorageDbContext : DbContext
             entity.Ignore(e => e.IsComplete);
             entity.Ignore(e => e.IsExpired);
             entity.Ignore(e => e.Progress);
+        });
+    }
+
+    private void ConfigureApiKeyEntity(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ApiKey>(entity =>
+        {
+            entity.ToTable("ApiKeys");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasConversion(
+                    id => id.Value,
+                    value => ApiKeyId.From(value))
+                .IsRequired();
+
+            entity.Property(e => e.UserId)
+                .HasConversion(
+                    id => id.Value,
+                    value => UserId.From(value))
+                .IsRequired();
+
+            entity.Property(e => e.KeyHash)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired();
+
+            entity.Property(e => e.ExpiresAt);
+
+            entity.Property(e => e.LastUsedAt);
+
+            entity.Property(e => e.IsRevoked)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(200);
+
+            // Indexes for common queries
+            entity.HasIndex(e => e.KeyHash)
+                .IsUnique()
+                .HasDatabaseName("IX_ApiKeys_KeyHash");
+
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("IX_ApiKeys_UserId");
         });
     }
 }

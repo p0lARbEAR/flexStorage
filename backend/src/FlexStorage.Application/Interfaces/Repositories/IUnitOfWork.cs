@@ -16,6 +16,11 @@ public interface IUnitOfWork : IDisposable
     IUploadSessionRepository UploadSessions { get; }
 
     /// <summary>
+    /// Gets the API key repository.
+    /// </summary>
+    IApiKeyRepository ApiKeys { get; }
+
+    /// <summary>
     /// Saves all changes to the database.
     /// </summary>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
