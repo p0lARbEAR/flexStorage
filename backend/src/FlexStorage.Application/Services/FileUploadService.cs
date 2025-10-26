@@ -11,7 +11,7 @@ namespace FlexStorage.Application.Services;
 /// <summary>
 /// Application service for handling file uploads.
 /// </summary>
-public class FileUploadService
+public class FileUploadService : IFileUploadService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHashService _hashService;
