@@ -33,9 +33,9 @@ Write failing test → Make it pass → Improve code
 ## Progress Summary
 
 ### Overall Test Status
-- **Total Tests Written:** 177 tests (excluding 4 placeholder tests)
-- **Tests Passing:** 177 tests
-- **Coverage:** Domain Layer (88 tests - complete), Application Layer (30 tests - MVP complete), Infrastructure Layer (43 tests - FileRepository + S3 Providers), API Layer (13 tests - FilesController), Integration Tests (3 tests - S3 provider integration)
+- **Total Tests Written:** 182 tests (excluding 4 placeholder tests)
+- **Tests Passing:** 182 tests
+- **Coverage:** Domain Layer (88 tests - complete), Application Layer (30 tests - MVP complete), Infrastructure Layer (43 tests - FileRepository + S3 Providers), API Layer (13 tests - FilesController), Integration Tests (8 tests - 3 unit integration + 5 E2E LocalStack)
 
 ### Test Group Completion
 - ✅ **Group 1:** Domain Layer - Value Objects (44 tests - FileSize:16, UploadStatus:13, FileType:9, StorageLocation:6)
@@ -50,7 +50,7 @@ Write failing test → Make it pass → Improve code
 - ⬜ **Group 9.2:** Infrastructure Layer - Other Repositories (Not started)
 - ⬜ **Group 10:** Background Jobs (Not started)
 - ✅ **Group 11:** API Layer - Controllers (13 tests - FilesController upload:6 + download:7)
-- 🔄 **Group 12:** Integration Tests (3 tests - S3 provider integration)
+- ✅ **Group 12:** Integration Tests (8 tests - 3 provider unit tests + 5 E2E LocalStack tests)
 
 ### Latest Commits
 1. Application Layer interfaces (repositories and services)
@@ -93,6 +93,15 @@ Write failing test → Make it pass → Improve code
      - Mock retrieval status tracking
    - Removed duplicate test files from Storage/ directory
    - Consolidated to StorageProviders/ namespace
+9. **NEW:** End-to-End LocalStack Integration Tests (5 tests)
+   - Full E2E test: Upload → LocalStack S3 → Download → Delete (Deep Archive provider)
+   - Full E2E test: Upload → LocalStack S3 → Download → Delete (Flexible Retrieval provider)
+   - Test both providers working independently in separate buckets
+   - Health check verification against running LocalStack instance
+   - Glacier retrieval initiation test (with LocalStack simulation)
+   - Tests marked as skippable - require `docker-compose up localstack`
+   - Implements IAsyncLifetime for proper bucket setup/teardown
+   - Validates real S3 operations against LocalStack endpoint (localhost:4566)
 
 ### Architectural Findings
 - **Download API Design Issue:** Current `/download` endpoint handles both direct download (200 OK) and retrieval initiation (202 Accepted)
