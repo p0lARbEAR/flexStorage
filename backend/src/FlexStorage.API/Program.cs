@@ -1,4 +1,6 @@
 
+using Amazon;
+using Amazon.Runtime;
 using Amazon.S3;
 using FlexStorage.API.Middleware;
 using FlexStorage.Application.Interfaces.Repositories;
@@ -15,8 +17,68 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 // AWS Services
-builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
-builder.Services.AddAWSService<IAmazonS3>();
+builder.Services.AddSingleton<IAmazonS3>(provider =>
+{
+    var configuration = provider.GetRequiredService<IConfiguration>();
+    var logger = provider.GetService<ILogger<Program>>();
+    
+    // Get AWS configuration values
+    var awsRegion = configuration["AWS:Region"] ?? "us-east-1";
+    var serviceUrl = configuration["AWS:S3:ServiceURL"];
+    var accessKey = configuration["AWS:AccessKey"];
+    var secretKey = configuration["AWS:SecretKey"];
+    
+    // Create S3 configuration
+    var config = new AmazonS3Config
+    {
+        RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(awsRegion),
+        AuthenticationRegion = awsRegion,
+        UseHttp = configuration.GetValue<bool>("AWS:S3:UseHttp", false),
+        ForcePathStyle = configuration.GetValue<bool>("AWS:S3:ForcePathStyle", false),
+        DisableHostPrefixInjection = configuration.GetValue<bool>("AWS:S3:DisableHostPrefixInjection", false),
+        MaxErrorRetry = configuration.GetValue<int>("AWS:S3:MaxErrorRetry", 3),
+        UseDualstackEndpoint = configuration.GetValue<bool>("AWS:S3:UseDualstackEndpoint", false),
+        UseAccelerateEndpoint = configuration.GetValue<bool>("AWS:S3:UseAccelerateEndpoint", false),
+        DisableLogging = configuration.GetValue<bool>("AWS:S3:DisableLogging", true)
+    };
+    
+    // Set service URL if provided (for LocalStack)
+    if (!string.IsNullOrEmpty(serviceUrl))
+    {
+        config.ServiceURL = serviceUrl;
+        logger?.LogInformation("S3 Client configured with custom endpoint: {ServiceURL}", serviceUrl);
+    }
+    
+    // Create credentials
+    AmazonS3Client client;
+    if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
+    {
+        // Use explicit credentials (for LocalStack or specific AWS credentials)
+        var credentials = new Amazon.Runtime.BasicAWSCredentials(accessKey, secretKey);
+        client = new AmazonS3Client(credentials, config);
+        logger?.LogInformation("S3 Client configured with explicit credentials");
+    }
+    else
+    {
+        // Use default AWS credential chain (for production)
+        client = new AmazonS3Client(config);
+        logger?.LogInformation("S3 Client configured with default AWS credential chain");
+    }
+    
+    // Set environment variables for AWS SDK
+    if (!string.IsNullOrEmpty(accessKey))
+        Environment.SetEnvironmentVariable("AWS_ACCESS_KEY_ID", accessKey);
+    if (!string.IsNullOrEmpty(secretKey))
+        Environment.SetEnvironmentVariable("AWS_SECRET_ACCESS_KEY", secretKey);
+    if (!string.IsNullOrEmpty(awsRegion))
+        Environment.SetEnvironmentVariable("AWS_DEFAULT_REGION", awsRegion);
+    if (!string.IsNullOrEmpty(serviceUrl))
+        Environment.SetEnvironmentVariable("AWS_ENDPOINT_URL", serviceUrl);
+    
+    logger?.LogInformation("S3 Client configured for region {Region}", awsRegion);
+    
+    return client;
+});
 
 // Database
 builder.Services.AddDbContext<FlexStorageDbContext>(options =>
@@ -39,6 +101,7 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // Infrastructure Services
 builder.Services.AddScoped<IHashService, HashService>();
+builder.Services.AddScoped<IStorageService, StorageService>();
 
 // Storage Providers
 var deepArchiveBucket =
