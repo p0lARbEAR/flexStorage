@@ -236,21 +236,56 @@ public class FileRepositoryTests : IDisposable
         result.Items.First().Metadata.OriginalFileName.Should().Contain("photo");
     }
 
+    [Fact]
+    public async Task SearchAsync_WithDateRange_ShouldFilterResults()
+    {
+        // Arrange - RED: Write test for date filtering
+        var userId = UserId.New();
+        var oldDate = DateTime.UtcNow.AddDays(-30);
+        var recentDate = DateTime.UtcNow.AddDays(-5);
+        var todayDate = DateTime.UtcNow;
+
+        var file1 = CreateTestFile(userId: userId, fileName: "old-file.jpg", capturedAt: oldDate);
+        var file2 = CreateTestFile(userId: userId, fileName: "recent-file.jpg", capturedAt: recentDate);
+        var file3 = CreateTestFile(userId: userId, fileName: "today-file.jpg", capturedAt: todayDate);
+
+        await _context.Files.AddRangeAsync(file1, file2, file3);
+        await _context.SaveChangesAsync();
+
+        var criteria = new FlexStorage.Application.Interfaces.Repositories.FileSearchCriteria
+        {
+            UserId = userId,
+            FromDate = DateTime.UtcNow.AddDays(-10),  // Last 10 days
+            ToDate = DateTime.UtcNow
+        };
+
+        // Act
+        var result = await _sut.SearchAsync(criteria);
+
+        // Assert - Should find files from last 10 days (file2 and file3)
+        result.Items.Should().HaveCount(2);
+        result.Items.Should().Contain(f => f.Metadata.OriginalFileName == "recent-file.jpg");
+        result.Items.Should().Contain(f => f.Metadata.OriginalFileName == "today-file.jpg");
+        result.Items.Should().NotContain(f => f.Metadata.OriginalFileName == "old-file.jpg");
+    }
+
     private File CreateTestFile(
         UserId? userId = null,
         string? hash = null,
         string? mimeType = null,
-        string? fileName = null)
+        string? fileName = null,
+        DateTime? capturedAt = null)
     {
         var effectiveUserId = userId ?? UserId.New();
         var effectiveHash = hash ?? $"sha256:{Guid.NewGuid():N}";
         var effectiveMimeType = mimeType ?? "image/jpeg";
         var effectiveFileName = fileName ?? "test-file.jpg";
+        var effectiveCapturedAt = capturedAt ?? DateTime.UtcNow;
 
         var metadata = FileMetadata.Create(
             effectiveFileName,
             effectiveHash,
-            DateTime.UtcNow);
+            effectiveCapturedAt);
 
         return File.Create(
             effectiveUserId,
