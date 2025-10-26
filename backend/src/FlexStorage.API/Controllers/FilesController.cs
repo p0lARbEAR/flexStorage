@@ -1,5 +1,5 @@
 using FlexStorage.Application.Interfaces.Services;
-using FlexStorage.Application.Services;
+using FlexStorage.Domain.DomainServices;
 using FlexStorage.Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
 
@@ -38,6 +38,141 @@ public class FilesController : ControllerBase
 
         // In a real app, you'd map this to a DTO.
         return Ok(file);
+    }
+
+    [HttpGet("{id:guid}/download")]
+    public async Task<IActionResult> DownloadFile(Guid id, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Starting download for file {FileId}", id);
+
+        var result = await _fileRetrievalService.DownloadFileAsync(FileId.From(id), cancellationToken);
+
+        if (!result.Success)
+        {
+            _logger.LogWarning("Download failed for file {FileId}: {Error}", id, result.ErrorMessage);
+            
+            if (result.ErrorMessage?.Contains("not found") == true)
+                return NotFound(new { error = result.ErrorMessage });
+            
+            // Check if this is a Glacier storage class error (needs restoration)
+            if (result.ErrorMessage?.Contains("storage class") == true || 
+                result.ErrorMessage?.Contains("not valid for the object") == true)
+            {
+                _logger.LogInformation("File {FileId} is in Glacier and needs restoration", id);
+                
+                // Initiate restoration
+                var retrievalResult = await _fileRetrievalService.InitiateRetrievalAsync(
+                    FileId.From(id), 
+                    RetrievalTier.Standard, 
+                    cancellationToken);
+                
+                if (retrievalResult.Success)
+                {
+                    return Accepted(new { 
+                        message = "File is archived and restoration has been initiated",
+                        retrievalId = retrievalResult.RetrievalId,
+                        estimatedCompletionTime = retrievalResult.EstimatedCompletionTime,
+                        status = "restoration_in_progress"
+                    });
+                }
+                else
+                {
+                    return BadRequest(new { error = $"Failed to initiate restoration: {retrievalResult.ErrorMessage}" });
+                }
+            }
+            
+            return BadRequest(new { error = result.ErrorMessage });
+        }
+
+        if (result.FileStream is null)
+        {
+            _logger.LogError("Download succeeded but FileStream is null for file {FileId}", id);
+            return StatusCode(500, new { error = "File stream is not available" });
+        }
+
+        _logger.LogInformation("File {FileId} download started successfully", id);
+
+        // Return the file stream with appropriate headers
+        return File(
+            result.FileStream, 
+            result.ContentType ?? "application/octet-stream",
+            result.FileName ?? $"file-{id}");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ListFiles([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] Guid? userId = null, CancellationToken cancellationToken = default)
+    {
+        // For testing: if no userId provided, use a default one
+        // In production, this would come from authentication
+        var actualUserId = userId.HasValue 
+            ? UserId.From(userId.Value)
+            : UserId.From(Guid.Parse("123e4567-e89b-12d3-a456-426614174000"));
+        
+        _logger.LogInformation("Listing files for user {UserId}, page {Page}, pageSize {PageSize}", actualUserId, page, pageSize);
+
+        var files = await _fileRetrievalService.GetUserFilesAsync(actualUserId, page, pageSize, cancellationToken);
+
+        return Ok(new
+        {
+            files = files.Select(f => new
+            {
+                id = f.Id.Value,
+                fileName = f.Metadata.OriginalFileName,
+                size = f.Size.Bytes,
+                contentType = f.Type.MimeType,
+                uploadedAt = f.Metadata.CreatedAt,
+                status = f.Status.CurrentState.ToString(),
+                userId = f.UserId.Value // Include user ID in response for debugging
+            }),
+            page,
+            pageSize,
+            totalFiles = files.Count,
+            queriedUserId = actualUserId.Value // Show which user ID was used for the query
+        });
+    }
+
+    [HttpGet("debug/all")]
+    public async Task<IActionResult> ListAllFiles(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("DEBUG: Listing all files in database");
+
+        // This is a debug endpoint - in production this would be removed or secured
+        // We'll need to access the repository directly since GetUserFilesAsync filters by user
+        
+        // For now, let's try a few common user IDs that might have been used
+        var commonUserIds = new[]
+        {
+            Guid.Parse("123e4567-e89b-12d3-a456-426614174000"), // Default hardcoded
+            Guid.Parse("00000000-0000-0000-0000-000000000000"), // Empty GUID
+        };
+
+        var allFiles = new List<object>();
+        
+        foreach (var testUserId in commonUserIds)
+        {
+            var files = await _fileRetrievalService.GetUserFilesAsync(UserId.From(testUserId), 1, 100, cancellationToken);
+            foreach (var file in files)
+            {
+                allFiles.Add(new
+                {
+                    id = file.Id.Value,
+                    fileName = file.Metadata.OriginalFileName,
+                    size = file.Size.Bytes,
+                    contentType = file.Type.MimeType,
+                    uploadedAt = file.Metadata.CreatedAt,
+                    status = file.Status.CurrentState.ToString(),
+                    userId = file.UserId.Value
+                });
+            }
+        }
+
+        return Ok(new
+        {
+            message = "DEBUG: All files found with common user IDs",
+            totalFiles = allFiles.Count,
+            files = allFiles,
+            searchedUserIds = commonUserIds
+        });
     }
 
     [HttpPost]
