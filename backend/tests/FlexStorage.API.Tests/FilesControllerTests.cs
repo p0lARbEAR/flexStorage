@@ -276,4 +276,40 @@ public class FilesControllerTests
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
+
+    [Fact]
+    public async Task UploadFile_WithEmptyFile_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var userId = Guid.Parse("123e4567-e89b-12d3-a456-426614174000");
+        var mockFile = new Mock<IFormFile>();
+        mockFile.Setup(f => f.FileName).Returns("empty.jpg");
+        mockFile.Setup(f => f.ContentType).Returns("image/jpeg");
+        mockFile.Setup(f => f.Length).Returns(0); // Empty file
+
+        var command = new UploadFileCommand
+        {
+            File = mockFile.Object,
+            UserId = userId
+        };
+
+        // Act
+        var result = await _controller.UploadFile(command, CancellationToken.None);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.NotNull(badRequestResult.Value);
+        Assert.Equal("File is empty", badRequestResult.Value);
+
+        // Verify upload service was NOT called
+        _fileUploadServiceMock.Verify(
+            s => s.UploadAsync(
+                It.IsAny<UserId>(),
+                It.IsAny<Stream>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
 }
