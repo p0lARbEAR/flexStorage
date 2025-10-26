@@ -138,10 +138,7 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
                 BucketName = _bucketName,
                 Key = key,
                 Days = 1, // Keep restored object available for 1 day
-                GlacierJobParameters = new GlacierJobParameters
-                {
-                    Tier = glacierTier
-                }
+                Tier = glacierTier
             };
 
             var response = await _s3Client.RestoreObjectAsync(request, cancellationToken);

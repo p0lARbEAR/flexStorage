@@ -137,14 +137,14 @@ public class FlexStorageDbContext : DbContext
             entity.HasIndex(e => e.UserId)
                 .HasDatabaseName("IX_Files_UserId");
 
-            entity.HasIndex("Metadata_FileHash")
+            entity.HasIndex("FileHash")
                 .IsUnique()
                 .HasDatabaseName("IX_Files_FileHash");
 
-            entity.HasIndex("Metadata_CapturedAt")
+            entity.HasIndex("CapturedAt")
                 .HasDatabaseName("IX_Files_CapturedAt");
 
-            entity.HasIndex("Status_CurrentState")
+            entity.HasIndex("Status")
                 .HasDatabaseName("IX_Files_Status");
 
             // Ignore domain events (not persisted)

@@ -54,7 +54,7 @@ public class FileRetrievalService
             var estimatedTime = DateTime.UtcNow.Add(retrievalResult.EstimatedCompletionTime);
 
             return InitiateRetrievalResult.SuccessResult(
-                retrievalResult.RetrievalId,
+                retrievalResult.RetrievalId ?? throw new InvalidOperationException("RetrievalId cannot be null for successful retrieval"),
                 estimatedTime);
         }
         catch (Exception ex)

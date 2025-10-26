@@ -138,10 +138,7 @@ public class S3GlacierFlexibleRetrievalProvider : IStorageProvider
                 BucketName = _bucketName,
                 Key = key,
                 Days = 1,
-                GlacierJobParameters = new GlacierJobParameters
-                {
-                    Tier = glacierTier
-                }
+                Tier = glacierTier
             };
 
             var response = await _s3Client.RestoreObjectAsync(request, cancellationToken);
