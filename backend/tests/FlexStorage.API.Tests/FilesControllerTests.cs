@@ -343,4 +343,53 @@ public class FilesControllerTests
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task UploadFile_WhenDuplicate_ShouldReturnOkWithDuplicateMessage()
+    {
+        // Arrange
+        var userId = Guid.Parse("123e4567-e89b-12d3-a456-426614174000");
+        var fileName = "duplicate-photo.jpg";
+        var contentType = "image/jpeg";
+        var fileContent = new byte[] { 1, 2, 3, 4, 5 };
+        var existingFileId = FileId.New();
+
+        var mockFile = new Mock<IFormFile>();
+        mockFile.Setup(f => f.FileName).Returns(fileName);
+        mockFile.Setup(f => f.ContentType).Returns(contentType);
+        mockFile.Setup(f => f.Length).Returns(fileContent.Length);
+        mockFile.Setup(f => f.OpenReadStream()).Returns(new MemoryStream(fileContent));
+
+        var command = new UploadFileCommand
+        {
+            File = mockFile.Object,
+            UserId = userId
+        };
+
+        // Upload result indicating duplicate
+        var uploadResult = UploadFileResult.DuplicateResult(existingFileId);
+
+        _fileUploadServiceMock
+            .Setup(s => s.UploadAsync(
+                It.IsAny<UserId>(),
+                It.IsAny<Stream>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(uploadResult);
+
+        // Act
+        var result = await _controller.UploadFile(command, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(okResult.Value);
+
+        // Verify the response contains duplicate message and file ID
+        var responseValue = okResult.Value.ToString();
+        Assert.NotNull(responseValue);
+        Assert.Contains("File already exists", responseValue);
+        Assert.Contains(existingFileId.Value.ToString(), responseValue);
+    }
 }
