@@ -362,6 +362,47 @@ public class FileRepositoryTests : IDisposable
         result.Items[2].Metadata.OriginalFileName.Should().Be("file1.jpg");
     }
 
+    [Fact]
+    public async Task SearchAsync_WithNoMatches_ShouldReturnEmptyResult()
+    {
+        // Arrange - RED: Test handling of no matching results
+        var userId = UserId.New();
+        var file = CreateTestFile(userId: userId, fileName: "photo.jpg");
+        await _context.Files.AddAsync(file);
+        await _context.SaveChangesAsync();
+
+        var criteria = new FlexStorage.Application.Interfaces.Repositories.FileSearchCriteria
+        {
+            UserId = userId,
+            FileName = "nonexistent"  // No files match this name
+        };
+
+        // Act
+        var result = await _sut.SearchAsync(criteria);
+
+        // Assert - Should return empty list with correct pagination info
+        result.Items.Should().BeEmpty();
+        result.TotalCount.Should().Be(0);
+        result.Page.Should().Be(1);
+        result.TotalPages.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GetByUserIdAsync_WithNoFiles_ShouldReturnEmptyResult()
+    {
+        // Arrange - RED: Test handling of user with no files
+        var userId = UserId.New();
+
+        // Act
+        var result = await _sut.GetByUserIdAsync(userId, page: 1, pageSize: 10);
+
+        // Assert - Should return empty list with correct pagination info
+        result.Items.Should().BeEmpty();
+        result.TotalCount.Should().Be(0);
+        result.Page.Should().Be(1);
+        result.TotalPages.Should().Be(0);
+    }
+
     private File CreateTestFile(
         UserId? userId = null,
         string? hash = null,
