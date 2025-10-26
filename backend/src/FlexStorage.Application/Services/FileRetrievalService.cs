@@ -23,13 +23,26 @@ public class FileRetrievalService : IFileRetrievalService
     }
 
     /// <summary>
-    /// Initiates retrieval of a file from cold storage.
+    /// Gets file metadata by ID.
     /// </summary>
     public async Task<Domain.Entities.File?> GetFileMetadataAsync(
         FileId fileId, 
         CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.Files.GetByIdAsync(fileId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets files for a specific user with pagination.
+    /// </summary>
+    public async Task<IReadOnlyList<Domain.Entities.File>> GetUserFilesAsync(
+        UserId userId, 
+        int page, 
+        int pageSize, 
+        CancellationToken cancellationToken = default)
+    {
+        var pagedResult = await _unitOfWork.Files.GetByUserIdAsync(userId, page, pageSize, cancellationToken);
+        return pagedResult.Items;
     }
 
     /// <summary>
