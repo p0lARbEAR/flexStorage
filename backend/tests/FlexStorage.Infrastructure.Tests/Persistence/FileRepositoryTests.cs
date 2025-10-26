@@ -300,6 +300,37 @@ public class FileRepositoryTests : IDisposable
         result.Items.First().Type.Category.Should().Be(FileCategory.Photo);
     }
 
+    [Fact]
+    public async Task GetByUserIdAsync_ShouldOrderByNewestFirst()
+    {
+        // Arrange - RED: Test ordering by CapturedAt descending
+        var userId = UserId.New();
+        var oldestDate = DateTime.UtcNow.AddDays(-30);
+        var middleDate = DateTime.UtcNow.AddDays(-15);
+        var newestDate = DateTime.UtcNow.AddDays(-5);
+
+        var oldFile = CreateTestFile(userId: userId, fileName: "oldest.jpg", capturedAt: oldestDate);
+        var middleFile = CreateTestFile(userId: userId, fileName: "middle.jpg", capturedAt: middleDate);
+        var newestFile = CreateTestFile(userId: userId, fileName: "newest.jpg", capturedAt: newestDate);
+
+        // Add files in random order to ensure ordering is done by query, not insertion
+        await _context.Files.AddRangeAsync(middleFile, oldFile, newestFile);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _sut.GetByUserIdAsync(userId, page: 1, pageSize: 10);
+
+        // Assert - Should be ordered newest to oldest
+        result.Items.Should().HaveCount(3);
+        result.Items[0].Metadata.OriginalFileName.Should().Be("newest.jpg");
+        result.Items[1].Metadata.OriginalFileName.Should().Be("middle.jpg");
+        result.Items[2].Metadata.OriginalFileName.Should().Be("oldest.jpg");
+
+        // Verify dates are in descending order
+        result.Items[0].Metadata.CapturedAt.Should().BeAfter(result.Items[1].Metadata.CapturedAt);
+        result.Items[1].Metadata.CapturedAt.Should().BeAfter(result.Items[2].Metadata.CapturedAt);
+    }
+
     private File CreateTestFile(
         UserId? userId = null,
         string? hash = null,
