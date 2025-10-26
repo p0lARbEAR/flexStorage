@@ -8,7 +8,7 @@ namespace FlexStorage.Domain.Entities;
 public class FileMetadata
 {
     private static readonly Regex InvalidFileCharsRegex = new(@"[<>:""/\\|?*\(\)\x00-\x1F]", RegexOptions.Compiled);
-    private readonly HashSet<string> _tags = new();
+    private readonly List<string> _tags = new();
 
     /// <summary>
     /// Gets the original filename as provided by the user.
@@ -114,8 +114,9 @@ public class FileMetadata
             return;
 
         var normalizedTag = tag.Trim().ToLowerInvariant();
-        if (_tags.Add(normalizedTag))
+        if (!_tags.Contains(normalizedTag))
         {
+            _tags.Add(normalizedTag);
             ModifiedAt = DateTime.UtcNow;
         }
     }
