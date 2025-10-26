@@ -151,7 +151,7 @@ public class FileRetrievalServiceTests
         // Assert
         result.Should().NotBeNull();
         result.Success.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("not uploaded");
+        result.ErrorMessage.Should().Contain("has not been uploaded yet");
     }
 
     [Fact]
