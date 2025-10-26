@@ -392,4 +392,48 @@ public class FilesControllerTests
         Assert.Contains("File already exists", responseValue);
         Assert.Contains(existingFileId.Value.ToString(), responseValue);
     }
+
+    [Fact]
+    public async Task UploadFile_WhenUploadFails_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var userId = Guid.Parse("123e4567-e89b-12d3-a456-426614174000");
+        var fileName = "test-photo.jpg";
+        var contentType = "image/jpeg";
+        var fileContent = new byte[] { 1, 2, 3, 4, 5 };
+        var errorMessage = "Storage service unavailable";
+
+        var mockFile = new Mock<IFormFile>();
+        mockFile.Setup(f => f.FileName).Returns(fileName);
+        mockFile.Setup(f => f.ContentType).Returns(contentType);
+        mockFile.Setup(f => f.Length).Returns(fileContent.Length);
+        mockFile.Setup(f => f.OpenReadStream()).Returns(new MemoryStream(fileContent));
+
+        var command = new UploadFileCommand
+        {
+            File = mockFile.Object,
+            UserId = userId
+        };
+
+        // Upload result indicating failure
+        var uploadResult = UploadFileResult.FailureResult(errorMessage);
+
+        _fileUploadServiceMock
+            .Setup(s => s.UploadAsync(
+                It.IsAny<UserId>(),
+                It.IsAny<Stream>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(uploadResult);
+
+        // Act
+        var result = await _controller.UploadFile(command, CancellationToken.None);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.NotNull(badRequestResult.Value);
+        Assert.Equal(errorMessage, badRequestResult.Value);
+    }
 }
