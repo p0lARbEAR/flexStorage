@@ -331,6 +331,37 @@ public class FileRepositoryTests : IDisposable
         result.Items[1].Metadata.CapturedAt.Should().BeAfter(result.Items[2].Metadata.CapturedAt);
     }
 
+    [Fact]
+    public async Task SearchAsync_ShouldOrderByNewestFirst()
+    {
+        // Arrange - RED: Test that SearchAsync also orders by newest first
+        var userId = UserId.New();
+        var oldestDate = DateTime.UtcNow.AddDays(-30);
+        var middleDate = DateTime.UtcNow.AddDays(-15);
+        var newestDate = DateTime.UtcNow.AddDays(-5);
+
+        var oldFile = CreateTestFile(userId: userId, fileName: "file1.jpg", capturedAt: oldestDate);
+        var middleFile = CreateTestFile(userId: userId, fileName: "file2.jpg", capturedAt: middleDate);
+        var newestFile = CreateTestFile(userId: userId, fileName: "file3.jpg", capturedAt: newestDate);
+
+        await _context.Files.AddRangeAsync(oldFile, newestFile, middleFile);
+        await _context.SaveChangesAsync();
+
+        var criteria = new FlexStorage.Application.Interfaces.Repositories.FileSearchCriteria
+        {
+            UserId = userId
+        };
+
+        // Act
+        var result = await _sut.SearchAsync(criteria);
+
+        // Assert - Should be ordered newest to oldest
+        result.Items.Should().HaveCount(3);
+        result.Items[0].Metadata.OriginalFileName.Should().Be("file3.jpg");
+        result.Items[1].Metadata.OriginalFileName.Should().Be("file2.jpg");
+        result.Items[2].Metadata.OriginalFileName.Should().Be("file1.jpg");
+    }
+
     private File CreateTestFile(
         UserId? userId = null,
         string? hash = null,
