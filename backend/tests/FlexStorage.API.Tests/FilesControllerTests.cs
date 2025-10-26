@@ -24,7 +24,7 @@ using FlexStorage.Domain.Entities;
 using FlexStorage.Application.Interfaces.Repositories;
 
 using FlexStorage.Application.Interfaces.Services;
-
+using FlexStorage.Application.DTOs;
 using FlexStorage.Domain.DomainServices;
 
 namespace FlexStorage.API.Tests;
@@ -86,5 +86,137 @@ public class FilesControllerTests
 
         // Assert
         Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task DownloadFile_WhenFileExists_ShouldReturnFileResult()
+    {
+        // Arrange
+        var fileId = Guid.NewGuid();
+        var fileStream = new MemoryStream([1, 2, 3, 4, 5]);
+        var fileName = "test-file.jpg";
+        var contentType = "image/jpeg";
+        var fileSize = 5L;
+
+        var downloadResult = DownloadFileResult.SuccessResult(
+            fileStream, fileName, contentType, fileSize);
+
+        _fileRetrievalServiceMock
+            .Setup(s => s.DownloadFileAsync(It.IsAny<FileId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(downloadResult);
+
+        // Act
+        var result = await _controller.DownloadFile(fileId, CancellationToken.None);
+
+        // Assert
+        var fileResult = Assert.IsType<FileStreamResult>(result);
+        Assert.Equal(fileStream, fileResult.FileStream);
+        Assert.Equal(contentType, fileResult.ContentType);
+        Assert.Equal(fileName, fileResult.FileDownloadName);
+    }
+
+    [Fact]
+    public async Task DownloadFile_WhenFileNotFound_ShouldReturnNotFound()
+    {
+        // Arrange
+        var fileId = Guid.NewGuid();
+        var downloadResult = DownloadFileResult.FailureResult("File not found");
+
+        _fileRetrievalServiceMock
+            .Setup(s => s.DownloadFileAsync(It.IsAny<FileId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(downloadResult);
+
+        // Act
+        var result = await _controller.DownloadFile(fileId, CancellationToken.None);
+
+        // Assert
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.NotNull(notFoundResult.Value);
+        Assert.Contains("File not found", notFoundResult.Value.ToString());
+    }
+
+    [Fact]
+    public async Task DownloadFile_WhenDownloadFails_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var fileId = Guid.NewGuid();
+        var downloadResult = DownloadFileResult.FailureResult("Storage service unavailable");
+
+        _fileRetrievalServiceMock
+            .Setup(s => s.DownloadFileAsync(It.IsAny<FileId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(downloadResult);
+
+        // Act
+        var result = await _controller.DownloadFile(fileId, CancellationToken.None);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.NotNull(badRequestResult.Value);
+        Assert.Contains("Storage service unavailable", badRequestResult.Value.ToString());
+    }
+
+    [Fact]
+    public async Task DownloadFile_WhenSuccessButStreamIsNull_ShouldReturnInternalServerError()
+    {
+        // Arrange
+        var fileId = Guid.NewGuid();
+        var downloadResult = new DownloadFileResult
+        {
+            Success = true,
+            FileStream = null, // This should not happen but we test for it
+            FileName = "test.jpg",
+            ContentType = "image/jpeg"
+        };
+
+        _fileRetrievalServiceMock
+            .Setup(s => s.DownloadFileAsync(It.IsAny<FileId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(downloadResult);
+
+        // Act
+        var result = await _controller.DownloadFile(fileId, CancellationToken.None);
+
+        // Assert
+        var statusCodeResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(500, statusCodeResult.StatusCode);
+        Assert.NotNull(statusCodeResult.Value);
+        Assert.Contains("File stream is not available", statusCodeResult.Value.ToString());
+    }
+
+    [Fact]
+    public async Task ListFiles_ShouldReturnFilesList()
+    {
+        // Arrange
+        var userId = UserId.From(Guid.Parse("123e4567-e89b-12d3-a456-426614174000"));
+        var files = new List<Domain.Entities.File>
+        {
+            FlexStorage.Domain.Entities.File.Create(
+                userId,
+                FileMetadata.Create("file1.jpg", "sha256:hash1", DateTime.UtcNow),
+                FileSize.FromBytes(1024),
+                FileType.FromMimeType("image/jpeg")
+            ),
+            FlexStorage.Domain.Entities.File.Create(
+                userId,
+                FileMetadata.Create("file2.pdf", "sha256:hash2", DateTime.UtcNow),
+                FileSize.FromBytes(2048),
+                FileType.FromMimeType("application/pdf")
+            )
+        };
+
+        _fileRetrievalServiceMock
+            .Setup(s => s.GetUserFilesAsync(It.IsAny<UserId>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(files);
+
+        // Act
+        var result = await _controller.ListFiles(1, 50, null, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(okResult.Value);
+        
+        // Verify the service was called with correct parameters
+        _fileRetrievalServiceMock.Verify(
+            s => s.GetUserFilesAsync(userId, 1, 50, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }
