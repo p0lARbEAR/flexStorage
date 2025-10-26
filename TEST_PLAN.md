@@ -33,9 +33,9 @@ Write failing test → Make it pass → Improve code
 ## Progress Summary
 
 ### Overall Test Status
-- **Total Tests Written:** 96 tests
-- **Tests Passing:** 96 tests
-- **Coverage:** Domain Layer (100%), Application Layer (MVP services complete)
+- **Total Tests Written:** 104 tests
+- **Tests Passing:** 104 tests
+- **Coverage:** Domain Layer (100%), Application Layer (MVP services complete), API Layer (FilesController download functionality complete)
 
 ### Test Group Completion
 - ✅ **Group 1:** Domain Layer - Value Objects (51 tests)
@@ -43,18 +43,36 @@ Write failing test → Make it pass → Improve code
 - 🔄 **Group 3:** Domain Layer - Domain Services (8 tests, FileHashCalculator deferred to IHashService)
 - ✅ **Group 4:** Application Layer - Repository Interfaces (Defined)
 - 🔄 **Group 5:** Application Layer - Application Services (22 tests - MVP complete)
-- ⬜ **Groups 6-12:** Not started
+- ⬜ **Groups 6-10:** Not started
+- 🔄 **Group 11:** API Layer - Controllers (8 tests - FilesController download functionality complete)
+- ⬜ **Group 12:** Not started
 
 ### Latest Commits
 1. Application Layer interfaces (repositories and services)
 2. FileUploadService with TDD (8 tests)
 3. ChunkedUploadService with TDD (8 tests)
 4. FileRetrievalService with TDD (6 tests) + domain enhancements
+5. **NEW:** FilesController download functionality with TDD (8 tests)
+   - Added `/api/v1/Files/{id}/download` endpoint
+   - Added `GetUserFilesAsync` method to FileRetrievalService
+   - Comprehensive test coverage for download scenarios
+   - All tests passing
+   - **ARCHITECTURAL ISSUE IDENTIFIED:** Mixed download/retrieval concerns
+
+### Architectural Findings
+- **Download API Design Issue:** Current `/download` endpoint handles both direct download (200 OK) and retrieval initiation (202 Accepted)
+- **Recommendation:** Split into separate endpoints for better API design and testing
+- **Impact:** Need additional test cases for retrieval workflow and status tracking
 
 ### Next Steps
-- Group 6: Rate Limiting & Quota services
+- **PRIORITY:** Refactor download/retrieval API design (Group 11.4.1)
+  - Split mixed concerns into separate endpoints
+  - Add comprehensive retrieval workflow tests
+  - Implement retrieval status tracking
 - Group 8: Infrastructure Layer (S3 Glacier providers, EF Core repositories)
-- Group 11: API Layer (Controllers, authentication)
+- Group 11.1: AuthController (API Key authentication)
+- Group 11.2: FilesController (Upload functionality)
+- Group 6: Rate Limiting & Quota services
 
 ---
 
@@ -416,18 +434,19 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 ### 5.3 FileRetrievalService ✅
 - ✅ Should retrieve file metadata by ID
 - ✅ Should return 404 if file not found
-- ⬜ Should generate direct download URL for non-Glacier files
+- ✅ Should download file directly when available
 - ✅ Should initiate Glacier retrieval for archived files
 - ✅ Should select retrieval tier (bulk, standard, expedited)
 - ⬜ Should save retrieval request to database
 - ✅ Should return estimated retrieval time
 - ✅ Should poll retrieval status from provider
-- ⬜ Should generate time-limited download URL when ready
+- ✅ Should return file stream for download when ready
 - ⬜ Should set download URL expiration to 24 hours
 - ⬜ Should validate user has permission to retrieve file
 - ⬜ Should track retrieval request in database
 - ⬜ Should expire retrieval request after timeout
 - ⬜ Should send webhook notification when retrieval ready
+- ✅ Should get user files with pagination
 
 **Test Class:** `FileRetrievalServiceTests.cs` (6 tests passing)
 **Dependencies:** IFileRepository, IStorageService
@@ -873,9 +892,9 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 
 ---
 
-### 11.4 FilesController (Retrieval)
-- ⬜ Should return file metadata by ID
-- ⬜ Should return 404 if file not found
+### 11.4 FilesController (Retrieval) ✅
+- ✅ Should return file metadata by ID
+- ✅ Should return 404 if file not found
 - ⬜ Should return thumbnail URL
 - ⬜ Should return 202 if thumbnail still generating
 - ⬜ Should serve thumbnail image
@@ -883,20 +902,87 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ⬜ Should return retrieval ID and estimated time
 - ⬜ Should return retrieval status
 - ⬜ Should return download URL when ready
-- ⬜ Should download file (redirect to presigned URL)
+- ✅ Should download file (return file stream directly)
+- ✅ Should return 404 if download file not found
+- ✅ Should return 400 if download fails
+- ✅ Should return 500 if file stream is null
 - ⬜ Should return 202 if file in Glacier and not retrieved
 - ⬜ Should support Range requests for resumable download
 - ⬜ Should return 206 Partial Content for range request
 - ⬜ Should validate user owns file before retrieval
 - ⬜ Should return 403 Forbidden if not owner
 
-**Test Class:** `FilesControllerRetrievalTests.cs`
+**Test Class:** `FilesControllerTests.cs` (8 tests passing - download functionality complete)
 **Dependencies:** FileRetrievalService, ThumbnailGenerationService
+**Location:** `backend/tests/FlexStorage.API.Tests/FilesControllerTests.cs:14`
+
+**Recent Implementation Details:**
+- ✅ Added `DownloadFile` endpoint at `GET /api/v1/Files/{id}/download`
+- ✅ Added `GetUserFilesAsync` method to `IFileRetrievalService` and implementation
+- ✅ Updated `FileRetrievalService` to support user file listing with pagination
+- ✅ Comprehensive test coverage including:
+  - Successful file download with proper headers
+  - 404 handling for missing files
+  - 400 handling for download failures
+  - 500 handling for null file streams
+  - User file listing functionality
+- ✅ All 8 tests passing in `FilesControllerTests.cs`
+- ✅ All 31 tests passing in Application layer
+- ✅ Download endpoint ready for integration testing
+
+**🚨 ARCHITECTURAL ISSUE IDENTIFIED:**
+The current `/download` endpoint handles TWO distinct operations:
+1. **Direct Download** (200 OK + file stream) - for immediately available files
+2. **Retrieval Initiation** (202 Accepted + restoration info) - for archived files
+
+**Recommendation:** Split into separate endpoints:
+- `GET /api/v1/Files/{id}/download` - Direct download only (fail if archived)
+- `POST /api/v1/Files/{id}/retrieve` - Initiate retrieval for archived files
+- `GET /api/v1/Files/{id}/retrieve/{retrievalId}` - Check retrieval status
+
+**Additional Test Cases Needed:**
+- ✅ Should return 202 when file needs restoration (currently implemented)
+- ⬜ Should return 409 if retrieval already in progress
+- ⬜ Should return retrieval status by retrieval ID
+- ⬜ Should allow download after successful retrieval
+- ⬜ Should handle retrieval timeout/failure
+- ⬜ Should validate retrieval tier selection
+- ⬜ Should track retrieval costs and quotas
 
 ---
 
-### 11.5 FilesController (Management)
-- ⬜ Should list files with pagination
+### 11.4.1 FilesController (Retrieval Workflow) ⬜
+**Status:** Architecture needs refactoring - current implementation mixes concerns
+
+**Recommended API Design:**
+```
+GET  /api/v1/Files/{id}/download          # Direct download (immediate)
+POST /api/v1/Files/{id}/retrieve          # Initiate retrieval (archived files)
+GET  /api/v1/Files/{id}/retrieve/{rid}    # Check retrieval status
+```
+
+**Test Cases for Separate Retrieval API:**
+- ⬜ Should initiate retrieval with tier selection (bulk/standard/expedited)
+- ⬜ Should return retrieval ID and estimated completion time
+- ⬜ Should return 409 if retrieval already in progress for same file
+- ⬜ Should return 400 if file is not archived (doesn't need retrieval)
+- ⬜ Should validate retrieval tier is supported by provider
+- ⬜ Should track retrieval costs against user quota
+- ⬜ Should return retrieval status (pending/in_progress/completed/failed)
+- ⬜ Should return progress percentage if available
+- ⬜ Should return download URL when retrieval completed
+- ⬜ Should expire retrieval request after timeout (24-48 hours)
+- ⬜ Should send webhook notification when retrieval ready
+- ⬜ Should allow cancellation of pending retrieval
+- ⬜ Should handle provider-specific retrieval limits
+
+**Test Class:** `FilesControllerRetrievalWorkflowTests.cs` (Not yet implemented)
+**Dependencies:** FileRetrievalService, RetrievalTrackingService
+
+---
+
+### 11.5 FilesController (Management) 🔄
+- ✅ Should list files with pagination
 - ⬜ Should filter files by type
 - ⬜ Should filter files by date range
 - ⬜ Should search files by query string
@@ -907,8 +993,9 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ⬜ Should batch compare hashes
 - ⬜ Should return sync status since timestamp
 
-**Test Class:** `FilesControllerManagementTests.cs`
+**Test Class:** `FilesControllerTests.cs` (1 test passing - list files functionality)
 **Dependencies:** FileSearchService, IFileRepository, HashComparisonService
+**Location:** `backend/tests/FlexStorage.API.Tests/FilesControllerTests.cs:14`
 
 ---
 
