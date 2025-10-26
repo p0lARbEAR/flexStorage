@@ -333,4 +333,12 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Mac
-.DS_Store
+.DS_Store# LocalSta
+ck
+.localstack/
+/tmp/localstack/# 
+Environment variables
+.env
+.env.local
+.env.development
+.env.production
