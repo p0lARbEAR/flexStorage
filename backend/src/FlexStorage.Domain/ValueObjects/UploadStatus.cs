@@ -72,6 +72,11 @@ public sealed class UploadStatus : IEquatable<UploadStatus>
     /// </summary>
     public bool IsArchived => CurrentState == State.Archived;
 
+    // EF Core constructor
+    private UploadStatus()
+    {
+    }
+
     private UploadStatus(State state, DateTime changedAt)
     {
         CurrentState = state;
