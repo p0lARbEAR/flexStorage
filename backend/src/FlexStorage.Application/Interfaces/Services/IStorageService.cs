@@ -34,7 +34,7 @@ public interface IStorageService
     /// <summary>
     /// Checks the status of a retrieval request.
     /// </summary>
-    Task<RetrievalStatus> GetRetrievalStatusAsync(
+    Task<RetrievalStatusDetail> GetRetrievalStatusAsync(
         string retrievalId,
         CancellationToken cancellationToken = default);
 

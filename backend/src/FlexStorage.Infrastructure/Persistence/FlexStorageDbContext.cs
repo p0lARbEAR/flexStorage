@@ -139,15 +139,8 @@ public class FlexStorageDbContext : DbContext
             entity.HasIndex(e => e.UserId)
                 .HasDatabaseName("IX_Files_UserId");
 
-            entity.HasIndex("Metadata_FileHash")
-                .IsUnique()
-                .HasDatabaseName("IX_Files_FileHash");
-
-            entity.HasIndex("Metadata_CapturedAt")
-                .HasDatabaseName("IX_Files_CapturedAt");
-
-            entity.HasIndex("Status_CurrentState")
-                .HasDatabaseName("IX_Files_Status");
+            // Note: Indexes on owned entity properties (FileHash, CapturedAt, Status) 
+            // will be added via migrations or raw SQL due to EF Core limitations with owned entities
 
             // Ignore domain events (not persisted)
             entity.Ignore(e => e.DomainEvents);

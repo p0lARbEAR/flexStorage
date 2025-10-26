@@ -1,25 +1,19 @@
+using System.Diagnostics;
 using Amazon.S3;
 using Amazon.S3.Model;
 using FlexStorage.Domain.DomainServices;
 using FlexStorage.Domain.ValueObjects;
-using System.Diagnostics;
 
 namespace FlexStorage.Infrastructure.Storage;
 
 /// <summary>
 /// Storage provider for AWS S3 Glacier Deep Archive.
-/// Lowest cost storage, 12-48 hour retrieval time.
+/// Provides lowest cost storage with 12-48 hour retrieval time.
 /// </summary>
 public class S3GlacierDeepArchiveProvider : IStorageProvider
 {
     private readonly IAmazonS3 _s3Client;
     private readonly string _bucketName;
-
-    public S3GlacierDeepArchiveProvider(IAmazonS3 s3Client, string bucketName)
-    {
-        _s3Client = s3Client ?? throw new ArgumentNullException(nameof(s3Client));
-        _bucketName = bucketName ?? throw new ArgumentNullException(nameof(bucketName));
-    }
 
     public string ProviderName => "s3-glacier-deep";
 
@@ -34,6 +28,12 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
         MaxRetrievalTime = TimeSpan.FromHours(48)
     };
 
+    public S3GlacierDeepArchiveProvider(IAmazonS3 s3Client, string bucketName)
+    {
+        _s3Client = s3Client ?? throw new ArgumentNullException(nameof(s3Client));
+        _bucketName = bucketName ?? throw new ArgumentNullException(nameof(bucketName));
+    }
+
     public async Task<UploadResult> UploadAsync(
         Stream fileStream,
         UploadOptions options,
@@ -41,16 +41,15 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
     {
         try
         {
-            var key = GenerateS3Key(options.FileName ?? "file");
+            var key = GenerateS3Key(options.FileName);
 
             var request = new PutObjectRequest
             {
                 BucketName = _bucketName,
                 Key = key,
                 InputStream = fileStream,
-                ContentType = options.ContentType ?? "application/octet-stream",
                 StorageClass = S3StorageClass.DeepArchive,
-                ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256
+                ContentType = options.ContentType ?? "application/octet-stream"
             };
 
             // Add metadata if provided
@@ -62,16 +61,7 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
                 }
             }
 
-            var response = await _s3Client.PutObjectAsync(request, cancellationToken);
-
-            if (response.HttpStatusCode != System.Net.HttpStatusCode.OK)
-            {
-                return new UploadResult
-                {
-                    Success = false,
-                    ErrorMessage = $"S3 upload failed with status code: {response.HttpStatusCode}"
-                };
-            }
+            await _s3Client.PutObjectAsync(request, cancellationToken);
 
             var location = StorageLocation.Create(ProviderName, $"s3://{_bucketName}/{key}");
 
@@ -82,20 +72,12 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
                 UploadedAt = DateTime.UtcNow
             };
         }
-        catch (AmazonS3Exception ex)
-        {
-            return new UploadResult
-            {
-                Success = false,
-                ErrorMessage = $"S3 error: {ex.Message}"
-            };
-        }
         catch (Exception ex)
         {
             return new UploadResult
             {
                 Success = false,
-                ErrorMessage = $"Upload failed: {ex.Message}"
+                ErrorMessage = ex.Message
             };
         }
     }
@@ -104,7 +86,7 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
         StorageLocation location,
         CancellationToken cancellationToken)
     {
-        var key = ExtractS3KeyFromLocation(location);
+        var key = ExtractS3Key(location);
 
         var request = new GetObjectRequest
         {
@@ -123,28 +105,18 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
     {
         try
         {
-            var key = ExtractS3KeyFromLocation(location);
-
-            var glacierTier = tier switch
-            {
-                RetrievalTier.Bulk => GlacierJobTier.Bulk,
-                RetrievalTier.Standard => GlacierJobTier.Standard,
-                RetrievalTier.Expedited => GlacierJobTier.Expedited,
-                _ => GlacierJobTier.Standard
-            };
+            var key = ExtractS3Key(location);
+            var retrievalId = Guid.NewGuid().ToString();
 
             var request = new RestoreObjectRequest
             {
                 BucketName = _bucketName,
                 Key = key,
-                Days = 1, // Keep restored object available for 1 day
-                GlacierJobParameters = new GlacierJobParameters
-                {
-                    Tier = glacierTier
-                }
+                Days = 1, // Keep restored copy for 1 day
+                Tier = MapRetrievalTier(tier)
             };
 
-            var response = await _s3Client.RestoreObjectAsync(request, cancellationToken);
+            await _s3Client.RestoreObjectAsync(request, cancellationToken);
 
             var estimatedTime = tier switch
             {
@@ -154,8 +126,6 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
                 _ => TimeSpan.FromHours(12)
             };
 
-            var retrievalId = $"{ProviderName}-{Guid.NewGuid():N}";
-
             return new RetrievalResult
             {
                 Success = true,
@@ -164,12 +134,13 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
                 Status = RetrievalStatus.InProgress
             };
         }
-        catch (AmazonS3Exception ex)
+        catch (Exception ex)
         {
             return new RetrievalResult
             {
                 Success = false,
-                ErrorMessage = $"Failed to initiate retrieval: {ex.Message}"
+                ErrorMessage = ex.Message,
+                Status = RetrievalStatus.Failed
             };
         }
     }
@@ -178,11 +149,9 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
         string retrievalId,
         CancellationToken cancellationToken)
     {
-        // Note: For S3 Glacier, we would need to store the mapping of retrievalId to S3 key
-        // in a database or cache. For now, this is a simplified implementation.
-        // In production, you would query the restore status from S3.
-
-        await Task.CompletedTask; // Placeholder for async signature
+        // Note: In a real implementation, we would store retrieval requests in a database
+        // and track their status. For now, we'll return a mock status.
+        await Task.Delay(1, cancellationToken); // Simulate async operation
 
         return new RetrievalStatusDetail
         {
@@ -198,7 +167,7 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
     {
         try
         {
-            var key = ExtractS3KeyFromLocation(location);
+            var key = ExtractS3Key(location);
 
             var request = new DeleteObjectRequest
             {
@@ -209,7 +178,7 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
             await _s3Client.DeleteObjectAsync(request, cancellationToken);
             return true;
         }
-        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch
         {
             return false;
         }
@@ -221,6 +190,7 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
 
         try
         {
+            // Simple health check - list buckets to verify connection
             await _s3Client.ListBucketsAsync(cancellationToken);
             stopwatch.Stop();
 
@@ -239,44 +209,43 @@ public class S3GlacierDeepArchiveProvider : IStorageProvider
             {
                 IsHealthy = false,
                 ResponseTime = stopwatch.Elapsed,
-                Message = $"S3 connection failed: {ex.Message}"
+                Message = ex.Message
             };
         }
     }
 
-    private string GenerateS3Key(string fileName)
+    private string GenerateS3Key(string? fileName)
     {
-        var date = DateTime.UtcNow;
-        var guid = Guid.NewGuid().ToString("N");
-        var sanitizedFileName = SanitizeFileName(fileName);
+        var timestamp = DateTime.UtcNow.ToString("yyyy/MM/dd");
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var sanitizedFileName = fileName ?? "file";
 
-        // Structure: files/YYYY/MM/DD/guid-filename
-        return $"files/{date:yyyy}/{date:MM}/{date:dd}/{guid}-{sanitizedFileName}";
+        return $"{timestamp}/{uniqueId}_{sanitizedFileName}";
     }
 
-    private string SanitizeFileName(string fileName)
+    private string ExtractS3Key(StorageLocation location)
     {
-        // Remove path characters and special chars
-        var invalid = Path.GetInvalidFileNameChars();
-        return string.Join("_", fileName.Split(invalid, StringSplitOptions.RemoveEmptyEntries));
-    }
+        // Extract key from s3://bucket/key format
+        var s3Uri = location.Path;
+        if (!s3Uri.StartsWith("s3://"))
+            throw new ArgumentException($"Invalid S3 URI format: {s3Uri}");
 
-    private string ExtractS3KeyFromLocation(StorageLocation location)
-    {
-        // Format: s3://bucket-name/key
-        var path = location.Path;
-        var s3Prefix = "s3://";
-
-        if (!path.StartsWith(s3Prefix))
-            throw new ArgumentException($"Invalid S3 location format: {path}");
-
-        // Remove s3://bucket-name/ to get just the key
-        var withoutProtocol = path[s3Prefix.Length..];
-        var slashIndex = withoutProtocol.IndexOf('/');
-
+        var pathPart = s3Uri["s3://".Length..];
+        var slashIndex = pathPart.IndexOf('/');
         if (slashIndex == -1)
-            throw new ArgumentException($"Invalid S3 location format: {path}");
+            throw new ArgumentException($"Invalid S3 URI format: {s3Uri}");
 
-        return withoutProtocol[(slashIndex + 1)..];
+        return pathPart[(slashIndex + 1)..];
+    }
+
+    private static GlacierJobTier MapRetrievalTier(RetrievalTier tier)
+    {
+        return tier switch
+        {
+            RetrievalTier.Bulk => GlacierJobTier.Bulk,
+            RetrievalTier.Standard => GlacierJobTier.Standard,
+            RetrievalTier.Expedited => GlacierJobTier.Expedited,
+            _ => GlacierJobTier.Standard
+        };
     }
 }

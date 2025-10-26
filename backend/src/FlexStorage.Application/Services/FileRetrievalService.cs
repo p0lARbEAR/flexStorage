@@ -9,7 +9,7 @@ namespace FlexStorage.Application.Services;
 /// <summary>
 /// Application service for retrieving files from storage.
 /// </summary>
-public class FileRetrievalService
+public class FileRetrievalService : IFileRetrievalService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IStorageService _storageService;
@@ -20,6 +20,16 @@ public class FileRetrievalService
     {
         _unitOfWork = unitOfWork;
         _storageService = storageService;
+    }
+
+    /// <summary>
+    /// Initiates retrieval of a file from cold storage.
+    /// </summary>
+    public async Task<Domain.Entities.File?> GetFileMetadataAsync(
+        FileId fileId, 
+        CancellationToken cancellationToken = default)
+    {
+        return await _unitOfWork.Files.GetByIdAsync(fileId, cancellationToken);
     }
 
     /// <summary>
@@ -54,7 +64,7 @@ public class FileRetrievalService
             var estimatedTime = DateTime.UtcNow.Add(retrievalResult.EstimatedCompletionTime);
 
             return InitiateRetrievalResult.SuccessResult(
-                retrievalResult.RetrievalId,
+                retrievalResult.RetrievalId ?? throw new InvalidOperationException("RetrievalId cannot be null for successful retrieval"),
                 estimatedTime);
         }
         catch (Exception ex)
