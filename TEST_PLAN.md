@@ -33,9 +33,9 @@ Write failing test → Make it pass → Improve code
 ## Progress Summary
 
 ### Overall Test Status
-- **Total Tests Written:** 195 tests (excluding 4 placeholder tests)
-- **Tests Passing:** 195 tests
-- **Coverage:** Domain Layer (88 tests - complete), Application Layer (30 tests - MVP complete), Infrastructure Layer (43 tests - FileRepository + S3 Providers), API Layer (26 tests - FilesController + AuthController), Integration Tests (8 tests - 3 unit integration + 5 E2E LocalStack)
+- **Total Tests Written:** 197 tests (excluding 4 placeholder tests)
+- **Tests Passing:** 197 tests
+- **Coverage:** Domain Layer (88 tests - complete), Application Layer (30 tests - MVP complete), Infrastructure Layer (45 tests - FileRepository + S3 Providers), API Layer (26 tests - FilesController + AuthController), Integration Tests (8 tests - 3 unit integration + 5 E2E LocalStack)
 
 ### Test Group Completion
 - ✅ **Group 1:** Domain Layer - Value Objects (44 tests - FileSize:16, UploadStatus:13, FileType:9, StorageLocation:6)
@@ -46,7 +46,7 @@ Write failing test → Make it pass → Improve code
 - ⬜ **Groups 6-7:** Not started
 - ✅ **Group 8.1-8.2:** Infrastructure Layer - S3 Storage Providers (26 tests - Deep Archive:11, Flexible Retrieval:15)
 - ⬜ **Group 8.3-8.4:** Backblaze B2 & Plugin Loader (Not started)
-- ✅ **Group 9.1:** Infrastructure Layer - FileRepository (17 tests - Complete)
+- ✅ **Group 9.1:** Infrastructure Layer - FileRepository (19 tests - Complete)
 - ⬜ **Group 9.2:** Infrastructure Layer - Other Repositories (Not started)
 - ⬜ **Group 10:** Background Jobs (Not started)
 - ✅ **Group 11:** API Layer - Controllers (26 tests - AuthController:13, FilesController upload:6 + download:7)
@@ -111,6 +111,21 @@ Write failing test → Make it pass → Improve code
    - Comprehensive error handling: 401 Unauthorized, 404 NotFound, 400 BadRequest
    - All tests follow TDD RED-GREEN-REFACTOR methodology
    - MVP P0 requirement: Simple API Key authentication - COMPLETE ✅
+11. **NEW:** FileRepository Tags Filtering with TDD (commit 7a4f777)
+   - RED: Created test `SearchAsync_WithTags_ShouldFilterByTags`
+   - Tests filtering files by metadata tags using OR logic (any tag matches)
+   - GREEN: Implemented tag filtering with client-side evaluation for EF InMemory compatibility
+   - Uses HashSet for normalized tag comparison (case-insensitive)
+   - Filters files that have ANY of the specified tags
+   - All 19 FileRepository tests passing
+12. **NEW:** FileRepository Status Filtering with TDD (commit e1df5f7)
+   - RED: Created test `SearchAsync_WithStatus_ShouldFilterByStatus`
+   - Tests filtering files by UploadStatus (Pending, Completed, Archived)
+   - Uses proper domain methods (MarkAsArchived) and enum comparison
+   - GREEN: Implemented status filter in FileRepository.SearchAsync
+   - Added Status property to FileSearchCriteria in IFileRepository.cs
+   - Uses Enum.TryParse for string-to-enum conversion (case-insensitive)
+   - All 19 FileRepository tests passing
 
 ### Architectural Findings
 - **Download API Design Issue:** Current `/download` endpoint handles both direct download (200 OK) and retrieval initiation (202 Accepted)
@@ -145,7 +160,7 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ✅ Group 8.1: S3 Glacier Deep Archive Provider (11 tests)
 - ✅ Group 8.2: S3 Glacier Flexible Retrieval Provider (15 tests)
 - ⬜ Group 8.4: Plugin Loader
-- ✅ Group 9.1: FileRepository (EF Core) (17 tests)
+- ✅ Group 9.1: FileRepository (EF Core) (19 tests)
 - ✅ Group 11.1: AuthController (API Key auth) (13 tests)
 - ✅ Group 11.2: FilesController (Upload) (6 tests)
 - 🔄 Group 11.4: FilesController (Download/Retrieval) (8 tests - needs refactor)
@@ -791,7 +806,7 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 
 **Estimated Tests:** 40-45 test cases
 
-### 9.1 FileRepository (EF Core Implementation) - ✅ COMPLETE (17 tests)
+### 9.1 FileRepository (EF Core Implementation) - ✅ COMPLETE (19 tests)
 - ✅ Should add file entity to database (`AddAsync_ShouldPersistFileToDatabase`)
 - ✅ Should retrieve file by ID (`GetByIdAsync_ShouldReturnFileWhenExists`)
 - ✅ Should return null if file not found (`GetByIdAsync_ShouldReturnNullWhenNotExists`)
@@ -809,10 +824,10 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ✅ Should return null when hash doesn't match (`GetByHashAsync_ShouldReturnNullWhenNoMatch`)
 - ✅ Should update file entity (`UpdateAsync_ShouldPersistChanges`)
 - ✅ Should delete file (`DeleteAsync_ShouldRemoveFile`)
+- ✅ Should search by tags (`SearchAsync_WithTags_ShouldFilterByTags`)
+- ✅ Should filter by status (`SearchAsync_WithStatus_ShouldFilterByStatus`)
 - ⬜ Should handle concurrency conflicts (optimistic locking) - *Deferred to P1*
 - ⬜ Should soft delete file (mark as deleted, not remove) - *Not implemented (hard delete used)*
-- ⬜ Should filter by status - *Not yet tested*
-- ⬜ Should search by tags - *Not yet tested*
 - ⬜ Should use indexes for performance - *Covered by EF Core configuration*
 - ⬜ Should eager load related entities when needed - *Not applicable (owned entities auto-loaded)*
 
