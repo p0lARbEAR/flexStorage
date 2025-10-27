@@ -1,10 +1,12 @@
-
-using FlexStorage.Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
 
-namespace FlexStorage.API.Controllers;
+namespace FlexStorage.API.Models.Requests;
 
-public class UploadFileCommand
+/// <summary>
+/// Request model for file upload endpoint.
+/// Binds multipart form data from HTTP request.
+/// </summary>
+public class UploadFileRequest
 {
     [FromForm(Name = "file")]
     public IFormFile? File { get; set; }

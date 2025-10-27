@@ -4,6 +4,7 @@ using Xunit;
 using Moq;
 
 using FlexStorage.API.Controllers;
+using FlexStorage.API.Models.Requests;
 
 using FlexStorage.Application.Services;
 
@@ -237,7 +238,7 @@ public class FilesControllerTests
         mockFile.Setup(f => f.Length).Returns(fileContent.Length);
         mockFile.Setup(f => f.OpenReadStream()).Returns(new MemoryStream(fileContent));
 
-        var command = new UploadFileCommand
+        var command = new UploadFileRequest
         {
             File = mockFile.Object,
             UserId = userId,
@@ -288,7 +289,7 @@ public class FilesControllerTests
         mockFile.Setup(f => f.ContentType).Returns("image/jpeg");
         mockFile.Setup(f => f.Length).Returns(0); // Empty file
 
-        var command = new UploadFileCommand
+        var command = new UploadFileRequest
         {
             File = mockFile.Object,
             UserId = userId
@@ -319,7 +320,7 @@ public class FilesControllerTests
     {
         // Arrange
         var userId = Guid.Parse("123e4567-e89b-12d3-a456-426614174000");
-        var command = new UploadFileCommand
+        var command = new UploadFileRequest
         {
             File = null, // Null file
             UserId = userId
@@ -361,7 +362,7 @@ public class FilesControllerTests
         mockFile.Setup(f => f.Length).Returns(fileContent.Length);
         mockFile.Setup(f => f.OpenReadStream()).Returns(new MemoryStream(fileContent));
 
-        var command = new UploadFileCommand
+        var command = new UploadFileRequest
         {
             File = mockFile.Object,
             UserId = userId
@@ -411,7 +412,7 @@ public class FilesControllerTests
         mockFile.Setup(f => f.Length).Returns(fileContent.Length);
         mockFile.Setup(f => f.OpenReadStream()).Returns(new MemoryStream(fileContent));
 
-        var command = new UploadFileCommand
+        var command = new UploadFileRequest
         {
             File = mockFile.Object,
             UserId = userId
@@ -454,7 +455,7 @@ public class FilesControllerTests
         mockFile.Setup(f => f.Length).Returns(fileContent.Length);
         mockFile.Setup(f => f.OpenReadStream()).Returns(new MemoryStream(fileContent));
 
-        var command = new UploadFileCommand
+        var command = new UploadFileRequest
         {
             File = mockFile.Object,
             UserId = userId
