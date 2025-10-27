@@ -33,9 +33,9 @@ Write failing test → Make it pass → Improve code
 ## Progress Summary
 
 ### Overall Test Status
-- **Total Tests Written:** 182 tests (excluding 4 placeholder tests)
-- **Tests Passing:** 182 tests
-- **Coverage:** Domain Layer (88 tests - complete), Application Layer (30 tests - MVP complete), Infrastructure Layer (43 tests - FileRepository + S3 Providers), API Layer (13 tests - FilesController), Integration Tests (8 tests - 3 unit integration + 5 E2E LocalStack)
+- **Total Tests Written:** 195 tests (excluding 4 placeholder tests)
+- **Tests Passing:** 195 tests
+- **Coverage:** Domain Layer (88 tests - complete), Application Layer (30 tests - MVP complete), Infrastructure Layer (43 tests - FileRepository + S3 Providers), API Layer (26 tests - FilesController + AuthController), Integration Tests (8 tests - 3 unit integration + 5 E2E LocalStack)
 
 ### Test Group Completion
 - ✅ **Group 1:** Domain Layer - Value Objects (44 tests - FileSize:16, UploadStatus:13, FileType:9, StorageLocation:6)
@@ -49,7 +49,7 @@ Write failing test → Make it pass → Improve code
 - ✅ **Group 9.1:** Infrastructure Layer - FileRepository (17 tests - Complete)
 - ⬜ **Group 9.2:** Infrastructure Layer - Other Repositories (Not started)
 - ⬜ **Group 10:** Background Jobs (Not started)
-- ✅ **Group 11:** API Layer - Controllers (13 tests - FilesController upload:6 + download:7)
+- ✅ **Group 11:** API Layer - Controllers (26 tests - AuthController:13, FilesController upload:6 + download:7)
 - ✅ **Group 12:** Integration Tests (8 tests - 3 provider unit tests + 5 E2E LocalStack tests)
 
 ### Latest Commits
@@ -102,6 +102,15 @@ Write failing test → Make it pass → Improve code
    - Tests marked as skippable - require `docker-compose up localstack`
    - Implements IAsyncLifetime for proper bucket setup/teardown
    - Validates real S3 operations against LocalStack endpoint (localhost:4566)
+10. **NEW:** AuthController API Key Authentication Tests (13 tests)
+   - GenerateApiKey tests: valid request, service failure, never expiring key
+   - ValidateApiKey tests: X-API-Key header, Authorization header, missing/invalid/expired keys
+   - RevokeApiKey tests: valid revocation, missing key, non-existent key
+   - Header extraction tests: priority (X-API-Key over Authorization), empty key handling
+   - Tests both X-API-Key and Authorization: ApiKey {key} header formats
+   - Comprehensive error handling: 401 Unauthorized, 404 NotFound, 400 BadRequest
+   - All tests follow TDD RED-GREEN-REFACTOR methodology
+   - MVP P0 requirement: Simple API Key authentication - COMPLETE ✅
 
 ### Architectural Findings
 - **Download API Design Issue:** Current `/download` endpoint handles both direct download (200 OK) and retrieval initiation (202 Accepted)
@@ -125,7 +134,7 @@ Write failing test → Make it pass → Improve code
 This section maps **Test Group** completion to actual **Feature Phases** from BACKEND_SPEC.md, showing which production features are ready.
 
 ### Feature Phase P0 (MVP) - Core Upload & Storage 🔄
-**Status:** 85% Complete (Domain/Application/Infrastructure layers done, need API layer completion)
+**Status:** 95% Complete (Domain/Application/Infrastructure/API layers done, only PluginLoader pending)
 
 **Required Test Groups:**
 - ✅ Group 1: Domain Layer - Value Objects (Foundation)
@@ -137,7 +146,7 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ✅ Group 8.2: S3 Glacier Flexible Retrieval Provider (15 tests)
 - ⬜ Group 8.4: Plugin Loader
 - ✅ Group 9.1: FileRepository (EF Core) (17 tests)
-- ⬜ Group 11.1: AuthController (API Key auth)
+- ✅ Group 11.1: AuthController (API Key auth) (13 tests)
 - ✅ Group 11.2: FilesController (Upload) (6 tests)
 - 🔄 Group 11.4: FilesController (Download/Retrieval) (8 tests - needs refactor)
 
@@ -146,7 +155,7 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ✅ File metadata storage (domain models + repository)
 - ✅ S3 Glacier Deep Archive provider (infrastructure complete with 11 tests)
 - ✅ S3 Glacier Flexible Retrieval provider (infrastructure complete with 15 tests)
-- ⬜ Simple API Key authentication (needs API layer)
+- ✅ Simple API Key authentication (API layer complete with 13 tests)
 - ✅ File retrieval from Glacier (application/infrastructure logic complete)
 - ✅ Plugin interface for custom providers (IStorageProvider defined + implemented)
 
@@ -874,16 +883,22 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 
 **Estimated Tests:** 70-80 test cases
 
-### 11.1 AuthController
+### 11.1 AuthController - ✅ COMPLETE (13 tests)
 
 **API Key Authentication (Phase 1 - Local Development):**
-- ⬜ Should validate API key from X-API-Key header
-- ⬜ Should validate API key from Authorization header
-- ⬜ Should return 401 for missing API key
-- ⬜ Should return 401 for invalid API key
-- ⬜ Should extract user ID from valid API key
-- ⬜ Should generate new API key (admin endpoint)
-- ⬜ Should validate API key endpoint returns success
+- ✅ Should validate API key from X-API-Key header (`ValidateApiKey_WithValidXApiKeyHeader_ShouldReturnOkWithUserId`)
+- ✅ Should validate API key from Authorization header (`ValidateApiKey_WithValidAuthorizationHeader_ShouldReturnOkWithUserId`)
+- ✅ Should return 401 for missing API key (`ValidateApiKey_WithMissingApiKey_ShouldReturnUnauthorized`)
+- ✅ Should return 401 for invalid API key (`ValidateApiKey_WithInvalidApiKey_ShouldReturnUnauthorized`)
+- ✅ Should return 401 for expired API key (`ValidateApiKey_WithExpiredApiKey_ShouldReturnUnauthorized`)
+- ✅ Should extract user ID from valid API key (covered in validation tests)
+- ✅ Should generate new API key (`GenerateApiKey_WithValidRequest_ShouldReturnOkWithApiKey`)
+- ✅ Should handle API key generation failure (`GenerateApiKey_WhenServiceFails_ShouldReturnBadRequest`)
+- ✅ Should support never-expiring API keys (`GenerateApiKey_WithNeverExpiring_ShouldAcceptNullExpiresInDays`)
+- ✅ Should revoke API key (`RevokeApiKey_WithValidApiKey_ShouldReturnOk`)
+- ✅ Should return 401 when revoking without API key (`RevokeApiKey_WithMissingApiKey_ShouldReturnUnauthorized`)
+- ✅ Should return 404 for non-existent API key (`RevokeApiKey_WithNonExistentApiKey_ShouldReturnNotFound`)
+- ✅ Should prioritize X-API-Key over Authorization header (`ValidateApiKey_WithBothHeaders_ShouldPrioritizeXApiKeyHeader`)
 
 **OAuth2 Authentication (Phase 2 - Production):**
 - ⬜ Should return access token for valid authorization code
@@ -896,8 +911,9 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ⬜ Should rotate refresh token on refresh
 - ⬜ Should support multiple OAuth providers (Google, Apple)
 
-**Test Class:** `AuthControllerTests.cs`
-**Dependencies:** API Key service, OAuth2 service (mock)
+**Test Class:** `AuthControllerTests.cs` (13 tests passing)
+**Dependencies:** IApiKeyService (mock), ILogger (mock)
+**Location:** `backend/tests/FlexStorage.API.Tests/AuthControllerTests.cs`
 
 ---
 
