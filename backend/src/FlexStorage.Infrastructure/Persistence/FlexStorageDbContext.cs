@@ -1,6 +1,7 @@
 using FlexStorage.Domain.Entities;
 using FlexStorage.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using File = FlexStorage.Domain.Entities.File;
 
 namespace FlexStorage.Infrastructure.Persistence;
@@ -26,6 +27,22 @@ public class FlexStorageDbContext : DbContext
         ConfigureFileEntity(modelBuilder);
         ConfigureUploadSessionEntity(modelBuilder);
         ConfigureApiKeyEntity(modelBuilder);
+    }
+
+    private static string SerializeChunks(HashSet<int> chunks)
+    {
+        return System.Text.Json.JsonSerializer.Serialize(
+            chunks.OrderBy(x => x).ToList(),
+            (System.Text.Json.JsonSerializerOptions?)null);
+    }
+
+    private static HashSet<int> DeserializeChunks(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return new HashSet<int>();
+
+        var list = System.Text.Json.JsonSerializer.Deserialize<List<int>>(json, (System.Text.Json.JsonSerializerOptions?)null);
+        return list == null ? new HashSet<int>() : list.ToHashSet();
     }
 
     private void ConfigureFileEntity(ModelBuilder modelBuilder)
@@ -190,10 +207,16 @@ public class FlexStorageDbContext : DbContext
 
             entity.Property(e => e.CompletedAt);
 
-            // Store uploaded chunks as JSON array
+            // Store uploaded chunks as JSON array with sorting for consistency
+            var chunksConverter = new ValueConverter<HashSet<int>, string>(
+                v => SerializeChunks(v),
+                v => DeserializeChunks(v)
+            );
+
             entity.Property("_uploadedChunks")
                 .HasColumnName("UploadedChunks")
-                .HasMaxLength(10000);
+                .HasMaxLength(10000)
+                .HasConversion(chunksConverter);
 
             // Indexes
             entity.HasIndex(e => e.UserId)
