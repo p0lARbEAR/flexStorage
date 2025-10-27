@@ -176,6 +176,162 @@ public class FileRetrievalServiceTests
         result.ErrorMessage.Should().Contain("Storage error");
     }
 
+    [Fact]
+    public async Task GetFileMetadataAsync_WithValidFileId_ShouldReturnFile()
+    {
+        // Arrange - RED: Test GetFileMetadataAsync with valid ID
+        var userId = UserId.New();
+        var file = CreateCompletedFile(userId, "s3-glacier-deep");
+
+        _fileRepository.GetByIdAsync(file.Id, Arg.Any<CancellationToken>())
+            .Returns(file);
+
+        // Act
+        var result = await _sut.GetFileMetadataAsync(file.Id);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(file.Id);
+        result.Metadata.OriginalFileName.Should().Be("test.jpg");
+    }
+
+    [Fact]
+    public async Task GetFileMetadataAsync_WithInvalidFileId_ShouldReturnNull()
+    {
+        // Arrange - RED: Test GetFileMetadataAsync with invalid ID
+        var fileId = FileId.New();
+
+        _fileRepository.GetByIdAsync(fileId, Arg.Any<CancellationToken>())
+            .Returns((File?)null);
+
+        // Act
+        var result = await _sut.GetFileMetadataAsync(fileId);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetUserFilesAsync_ShouldReturnPaginatedFiles()
+    {
+        // Arrange - RED: Test GetUserFilesAsync with pagination
+        var userId = UserId.New();
+        var file1 = CreateCompletedFile(userId, "s3-glacier-deep");
+        var file2 = CreateCompletedFile(userId, "s3-glacier-flexible");
+
+        var pagedResult = new PagedResult<File>(
+            new List<File> { file1, file2 },
+            totalCount: 10,
+            page: 1,
+            pageSize: 2);
+
+        _fileRepository.GetByUserIdAsync(userId, 1, 2, Arg.Any<CancellationToken>())
+            .Returns(pagedResult);
+
+        // Act
+        var result = await _sut.GetUserFilesAsync(userId, 1, 2);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Count.Should().Be(2);
+        result[0].Should().Be(file1);
+        result[1].Should().Be(file2);
+    }
+
+    [Fact]
+    public async Task InitiateRetrievalAsync_WhenStorageServiceThrows_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test exception handling in InitiateRetrievalAsync
+        var userId = UserId.New();
+        var file = CreateCompletedFile(userId, "s3-glacier-deep");
+
+        _fileRepository.GetByIdAsync(file.Id, Arg.Any<CancellationToken>())
+            .Returns(file);
+
+        _storageService.InitiateRetrievalAsync(
+            file.Location!,
+            Arg.Any<RetrievalTier>(),
+            Arg.Any<CancellationToken>())
+            .Returns<RetrievalResult>(x => throw new InvalidOperationException("Storage service unavailable"));
+
+        // Act
+        var result = await _sut.InitiateRetrievalAsync(file.Id, RetrievalTier.Standard);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Storage service unavailable");
+    }
+
+    [Fact]
+    public async Task CheckRetrievalStatusAsync_WhenStorageServiceThrows_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test exception handling in CheckRetrievalStatusAsync
+        var retrievalId = "retrieval-123";
+
+        _storageService.GetRetrievalStatusAsync(retrievalId, Arg.Any<CancellationToken>())
+            .Returns<RetrievalStatusDetail>(x => throw new InvalidOperationException("Status check failed"));
+
+        // Act
+        var result = await _sut.CheckRetrievalStatusAsync(retrievalId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Status check failed");
+    }
+
+    [Fact]
+    public async Task DownloadFileAsync_WithFileNotFound_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test DownloadFileAsync with non-existent file
+        var fileId = FileId.New();
+
+        _fileRepository.GetByIdAsync(fileId, Arg.Any<CancellationToken>())
+            .Returns((File?)null);
+
+        // Act
+        var result = await _sut.DownloadFileAsync(fileId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("File not found");
+    }
+
+    [Fact]
+    public async Task InitiateRetrievalAsync_WhenStorageReturnsNullRetrievalId_ShouldHandleGracefully()
+    {
+        // Arrange - RED: Test null retrievalId edge case
+        var userId = UserId.New();
+        var file = CreateCompletedFile(userId, "s3-glacier-deep");
+
+        _fileRepository.GetByIdAsync(file.Id, Arg.Any<CancellationToken>())
+            .Returns(file);
+
+        var storageResult = new RetrievalResult
+        {
+            Success = true,
+            RetrievalId = null, // Edge case: null despite success
+            EstimatedCompletionTime = TimeSpan.FromHours(5),
+            Status = RetrievalStatus.Requested
+        };
+
+        _storageService.InitiateRetrievalAsync(
+            file.Location!,
+            Arg.Any<RetrievalTier>(),
+            Arg.Any<CancellationToken>())
+            .Returns(storageResult);
+
+        // Act
+        var result = await _sut.InitiateRetrievalAsync(file.Id, RetrievalTier.Bulk);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("RetrievalId cannot be null");
+    }
+
     private File CreateCompletedFile(UserId userId, string providerName)
     {
         var metadata = FileMetadata.Create("test.jpg", "sha256:abc123", DateTime.UtcNow);
