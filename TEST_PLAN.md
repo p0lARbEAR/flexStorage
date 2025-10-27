@@ -33,9 +33,9 @@ Write failing test → Make it pass → Improve code
 ## Progress Summary
 
 ### Overall Test Status
-- **Total Tests Written:** 213 tests (excluding 4 placeholder tests)
-- **Tests Passing:** 213 tests
-- **Coverage:** Domain Layer (88 tests - complete), Application Layer (46 tests - MVP complete), Infrastructure Layer (45 tests - FileRepository + S3 Providers), API Layer (26 tests - FilesController + AuthController), Integration Tests (8 tests - 3 unit integration + 5 E2E LocalStack)
+- **Total Tests Written:** 227 tests (excluding 4 placeholder tests)
+- **Tests Passing:** 227 tests
+- **Coverage:** Domain Layer (88 tests - complete), Application Layer (46 tests - MVP complete), Infrastructure Layer (59 tests - 3 Repositories + S3 Providers), API Layer (26 tests - FilesController + AuthController), Integration Tests (8 tests - 3 unit integration + 5 E2E LocalStack)
 
 ### Test Group Completion
 - ✅ **Group 1:** Domain Layer - Value Objects (44 tests - FileSize:16, UploadStatus:13, FileType:9, StorageLocation:6)
@@ -47,7 +47,7 @@ Write failing test → Make it pass → Improve code
 - ✅ **Group 8.1-8.2:** Infrastructure Layer - S3 Storage Providers (26 tests - Deep Archive:11, Flexible Retrieval:15)
 - ⬜ **Group 8.3-8.4:** Backblaze B2 & Plugin Loader (Not started)
 - ✅ **Group 9.1:** Infrastructure Layer - FileRepository (19 tests - Complete)
-- ⬜ **Group 9.2:** Infrastructure Layer - Other Repositories (Not started)
+- ✅ **Group 9.2:** Infrastructure Layer - ApiKeyRepository (7 tests - Complete), UploadSessionRepository (7 tests - Complete)
 - ⬜ **Group 10:** Background Jobs (Not started)
 - ✅ **Group 11:** API Layer - Controllers (26 tests - AuthController:13, FilesController upload:6 + download:7)
 - ✅ **Group 12:** Integration Tests (8 tests - 3 provider unit tests + 5 E2E LocalStack tests)
@@ -142,6 +142,25 @@ Write failing test → Make it pass → Improve code
    - Tests: InitiateRetrievalAsync exception, CheckRetrievalStatusAsync exception
    - Tests: DownloadFileAsync file not found, null retrievalId edge case
    - All 13 FileRetrievalService tests passing (100% coverage)
+16. **NEW:** ApiKeyRepository Infrastructure Tests (commit 512e460)
+   - Created ApiKeyRepositoryTests.cs with 7 comprehensive tests
+   - Tests: AddAsync persistence, GetByKeyHashAsync (valid/invalid), GetByUserIdAsync ordering
+   - Tests: Update (revoke operation), Delete, empty results
+   - Uses EF Core InMemory database with proper isolation (Guid-based DB names)
+   - All 7 tests passing, follows TDD RED-GREEN-REFACTOR methodology
+17. **NEW:** UploadSessionRepository Infrastructure Tests (commit bda7d99)
+   - Created UploadSessionRepositoryTests.cs with 7 comprehensive tests
+   - Tests: AddAsync persistence, GetByIdAsync (valid/invalid), GetActiveSessionsAsync filtering
+   - Tests: UpdateAsync with chunk tracking, DeleteAsync, empty results
+   - Validates HashSet<int> serialization for uploaded chunks
+   - All 7 tests passing, established repository test pattern
+18. **NEW:** FlexStorageDbContext HashSet<int> Serialization Fix (commit 2d0ff5e)
+   - Fixed EF Core InMemory limitation: "HashSet<int> cannot be used as primitive collection"
+   - Implemented ValueConverter<HashSet<int>, string> with JSON serialization
+   - Added SerializeChunks/DeserializeChunks helper methods
+   - Stores chunks as sorted JSON array for consistency: [0,2,5,10,15]
+   - EF Core auto-detects changes via string comparison (no ValueComparer needed)
+   - All UploadSessionRepository tests now passing with proper chunk persistence
 
 ### Architectural Findings
 - **Download API Design Issue:** Current `/download` endpoint handles both direct download (200 OK) and retrieval initiation (202 Accepted)
