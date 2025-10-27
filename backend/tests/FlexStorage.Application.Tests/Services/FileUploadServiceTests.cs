@@ -298,4 +298,117 @@ public class FileUploadServiceTests
         capturedFile.Should().NotBeNull();
         capturedFile!.Status.CurrentState.Should().Be(UploadStatus.State.Completed);
     }
+
+    [Fact]
+    public async Task UploadAsync_WhenHashCalculationFails_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test exception during hash calculation
+        var userId = UserId.New();
+        var fileStream = new MemoryStream(new byte[] { 1, 2, 3 });
+        var fileName = "test.jpg";
+        var mimeType = "image/jpeg";
+        var capturedAt = DateTime.UtcNow;
+
+        _hashService.CalculateSha256Async(fileStream, Arg.Any<CancellationToken>())
+            .Returns<string>(x => throw new InvalidOperationException("Hash calculation failed"));
+
+        // Act
+        var result = await _sut.UploadAsync(userId, fileStream, fileName, mimeType, capturedAt);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Hash calculation failed");
+
+        // Should NOT attempt to upload or save
+        await _storageService.DidNotReceive().UploadAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<UploadOptions>(),
+            Arg.Any<CancellationToken>());
+        await _fileRepository.DidNotReceive().AddAsync(Arg.Any<File>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UploadAsync_WhenSaveChangesFails_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test exception during SaveChanges
+        var userId = UserId.New();
+        var fileStream = new MemoryStream(new byte[] { 1, 2, 3 });
+        var fileName = "test.jpg";
+        var mimeType = "image/jpeg";
+        var capturedAt = DateTime.UtcNow;
+        var expectedHash = "sha256:abc123";
+
+        _hashService.CalculateSha256Async(fileStream, Arg.Any<CancellationToken>())
+            .Returns(expectedHash);
+
+        _fileRepository.GetByHashAsync(expectedHash, Arg.Any<CancellationToken>())
+            .Returns((File?)null);
+
+        _storageService.UploadAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<UploadOptions>(),
+            Arg.Any<CancellationToken>())
+            .Returns(new UploadResult
+            {
+                Location = StorageLocation.Create("s3-glacier-deep", "s3://bucket/path"),
+                Success = true
+            });
+
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<int>(x => throw new InvalidOperationException("Database error"));
+
+        // Act
+        var result = await _sut.UploadAsync(userId, fileStream, fileName, mimeType, capturedAt);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Database error");
+    }
+
+    [Fact]
+    public async Task UploadAsync_WithExcessiveFileSize_ShouldHandleGracefully()
+    {
+        // Arrange - RED: Test handling of very large files
+        var userId = UserId.New();
+        var largeFileSize = 5L * 1024 * 1024 * 1024; // 5GB
+        var fileStream = Substitute.For<Stream>();
+        fileStream.Length.Returns(largeFileSize);
+        fileStream.CanSeek.Returns(true);
+        fileStream.Position.Returns(0);
+
+        var fileName = "large-video.mp4";
+        var mimeType = "video/mp4";
+        var capturedAt = DateTime.UtcNow;
+        var expectedHash = "sha256:largefile123";
+
+        _hashService.CalculateSha256Async(fileStream, Arg.Any<CancellationToken>())
+            .Returns(expectedHash);
+
+        _fileRepository.GetByHashAsync(expectedHash, Arg.Any<CancellationToken>())
+            .Returns((File?)null);
+
+        _storageService.UploadAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<UploadOptions>(),
+            Arg.Any<CancellationToken>())
+            .Returns(new UploadResult
+            {
+                Location = StorageLocation.Create("s3-glacier-flexible", "s3://bucket/large-file"),
+                Success = true
+            });
+
+        // Act
+        var result = await _sut.UploadAsync(userId, fileStream, fileName, mimeType, capturedAt);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeTrue();
+        result.FileId.Should().NotBeNull();
+
+        // Verify large file was processed
+        await _fileRepository.Received(1).AddAsync(Arg.Any<File>(), Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
 }
