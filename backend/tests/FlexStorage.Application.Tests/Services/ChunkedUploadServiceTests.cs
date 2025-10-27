@@ -217,4 +217,158 @@ public class ChunkedUploadServiceTests
         status.Progress.Should().Be(40); // 2 of 5 chunks
         status.UploadedChunks.Should().HaveCount(2);
     }
+
+    [Fact]
+    public async Task InitiateUploadAsync_WhenSaveChangesFails_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test exception during SaveChanges
+        var userId = UserId.New();
+        var fileName = "test.jpg";
+        var mimeType = "image/jpeg";
+        var totalSize = 10_000_000L;
+        var capturedAt = DateTime.UtcNow;
+
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<int>(x => throw new InvalidOperationException("Database error"));
+
+        // Act
+        var result = await _sut.InitiateUploadAsync(userId, fileName, mimeType, totalSize, capturedAt);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Database error");
+    }
+
+    [Fact]
+    public async Task InitiateUploadAsync_WithZeroTotalSize_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test invalid total size
+        var userId = UserId.New();
+        var fileName = "test.jpg";
+        var mimeType = "image/jpeg";
+        var totalSize = 0L;
+        var capturedAt = DateTime.UtcNow;
+
+        // Act
+        var result = await _sut.InitiateUploadAsync(userId, fileName, mimeType, totalSize, capturedAt);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Total size must be positive");
+    }
+
+    [Fact]
+    public async Task InitiateUploadAsync_WithEmptyFileName_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test empty filename validation
+        var userId = UserId.New();
+        var fileName = "";
+        var mimeType = "image/jpeg";
+        var totalSize = 10_000_000L;
+        var capturedAt = DateTime.UtcNow;
+
+        // Act
+        var result = await _sut.InitiateUploadAsync(userId, fileName, mimeType, totalSize, capturedAt);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("File name cannot be null or empty");
+    }
+
+    [Fact]
+    public async Task UploadChunkAsync_WhenUpdateFails_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test exception during UploadChunkAsync SaveChanges
+        var userId = UserId.New();
+        var fileId = FileId.New();
+        var session = UploadSession.Create(fileId, userId, 10_000_000, 2_000_000);
+        var chunkData = new byte[2_000_000];
+
+        _sessionRepository.GetByIdAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns(session);
+
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<int>(x => throw new InvalidOperationException("Update failed"));
+
+        // Act
+        var result = await _sut.UploadChunkAsync(session.Id, 0, chunkData);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Update failed");
+    }
+
+    [Fact]
+    public async Task CompleteUploadAsync_WhenHashCalculationFails_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test exception during hash calculation
+        var userId = UserId.New();
+        var fileId = FileId.New();
+        var session = UploadSession.Create(fileId, userId, 10_000_000, 2_000_000);
+
+        // Mark all chunks as uploaded
+        for (int i = 0; i < session.TotalChunks; i++)
+        {
+            session.MarkChunkUploaded(i);
+        }
+
+        var file = File.Create(
+            userId,
+            FileMetadata.Create("test.jpg", "sha256:temp", DateTime.UtcNow),
+            FileSize.FromBytes(10_000_000),
+            FileType.FromMimeType("image/jpeg"));
+
+        _sessionRepository.GetByIdAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns(session);
+
+        _fileRepository.GetByIdAsync(fileId, Arg.Any<CancellationToken>())
+            .Returns(file);
+
+        var completeFileStream = new MemoryStream(new byte[10_000_000]);
+        _hashService.CalculateSha256Async(completeFileStream, Arg.Any<CancellationToken>())
+            .Returns<string>(x => throw new InvalidOperationException("Hash calculation failed"));
+
+        // Act
+        var result = await _sut.CompleteUploadAsync(session.Id, completeFileStream);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Hash calculation failed");
+    }
+
+    [Fact]
+    public async Task CompleteUploadAsync_WhenFileNotFound_ShouldReturnFailure()
+    {
+        // Arrange - RED: Test file not found scenario
+        var userId = UserId.New();
+        var fileId = FileId.New();
+        var session = UploadSession.Create(fileId, userId, 10_000_000, 2_000_000);
+
+        // Mark all chunks as uploaded
+        for (int i = 0; i < session.TotalChunks; i++)
+        {
+            session.MarkChunkUploaded(i);
+        }
+
+        _sessionRepository.GetByIdAsync(session.Id, Arg.Any<CancellationToken>())
+            .Returns(session);
+
+        _fileRepository.GetByIdAsync(fileId, Arg.Any<CancellationToken>())
+            .Returns((File?)null); // File not found
+
+        var completeFileStream = new MemoryStream(new byte[10_000_000]);
+
+        // Act
+        var result = await _sut.CompleteUploadAsync(session.Id, completeFileStream);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("File not found");
+    }
 }
