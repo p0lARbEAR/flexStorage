@@ -129,6 +129,7 @@ builder.Services.AddScoped<StorageProviderSelector>();
 // Application Services
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<IChunkedUploadService, ChunkedUploadService>();
 builder.Services.AddScoped<IFileRetrievalService, FileRetrievalService>();
 
 builder.Services.AddControllers();

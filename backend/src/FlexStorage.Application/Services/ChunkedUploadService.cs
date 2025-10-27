@@ -10,7 +10,7 @@ namespace FlexStorage.Application.Services;
 /// <summary>
 /// Application service for handling chunked file uploads.
 /// </summary>
-public class ChunkedUploadService
+public class ChunkedUploadService : IChunkedUploadService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHashService _hashService;

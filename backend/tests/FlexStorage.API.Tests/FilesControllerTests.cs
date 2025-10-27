@@ -244,7 +244,8 @@ public class FilesControllerTests
             CapturedAt = DateTime.UtcNow
         };
 
-        var uploadResult = UploadFileResult.SuccessResult(fileId);
+        var location = StorageLocation.Create("s3-glacier-deep", "s3://test-bucket/test-file.jpg");
+        var uploadResult = UploadFileResult.SuccessResult(fileId, location);
 
         _fileUploadServiceMock
             .Setup(s => s.UploadAsync(
@@ -367,7 +368,8 @@ public class FilesControllerTests
         };
 
         // Upload result indicating duplicate
-        var uploadResult = UploadFileResult.DuplicateResult(existingFileId);
+        var location = StorageLocation.Create("s3-glacier-deep", "s3://test-bucket/existing-file.jpg");
+        var uploadResult = UploadFileResult.SuccessResult(existingFileId, location, isDuplicate: true);
 
         _fileUploadServiceMock
             .Setup(s => s.UploadAsync(
