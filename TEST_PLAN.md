@@ -33,16 +33,16 @@ Write failing test → Make it pass → Improve code
 ## Progress Summary
 
 ### Overall Test Status
-- **Total Tests Written:** 197 tests (excluding 4 placeholder tests)
-- **Tests Passing:** 197 tests
-- **Coverage:** Domain Layer (88 tests - complete), Application Layer (30 tests - MVP complete), Infrastructure Layer (45 tests - FileRepository + S3 Providers), API Layer (26 tests - FilesController + AuthController), Integration Tests (8 tests - 3 unit integration + 5 E2E LocalStack)
+- **Total Tests Written:** 213 tests (excluding 4 placeholder tests)
+- **Tests Passing:** 213 tests
+- **Coverage:** Domain Layer (88 tests - complete), Application Layer (46 tests - MVP complete), Infrastructure Layer (45 tests - FileRepository + S3 Providers), API Layer (26 tests - FilesController + AuthController), Integration Tests (8 tests - 3 unit integration + 5 E2E LocalStack)
 
 ### Test Group Completion
 - ✅ **Group 1:** Domain Layer - Value Objects (44 tests - FileSize:16, UploadStatus:13, FileType:9, StorageLocation:6)
 - ✅ **Group 2:** Domain Layer - Entities (37 tests - File:16, FileMetadata:11, ApiKey:10)
 - ✅ **Group 3:** Domain Layer - Domain Services (7 tests - StorageProviderSelector)
 - ✅ **Group 4:** Application Layer - Repository Interfaces (Defined)
-- ✅ **Group 5:** Application Layer - Application Services (30 tests - FileUpload:7, ChunkedUpload:7, FileRetrieval:6, ApiKeyService:10)
+- ✅ **Group 5:** Application Layer - Application Services (46 tests - FileUpload:10, ChunkedUpload:13, FileRetrieval:13, ApiKeyService:10)
 - ⬜ **Groups 6-7:** Not started
 - ✅ **Group 8.1-8.2:** Infrastructure Layer - S3 Storage Providers (26 tests - Deep Archive:11, Flexible Retrieval:15)
 - ⬜ **Group 8.3-8.4:** Backblaze B2 & Plugin Loader (Not started)
@@ -126,6 +126,22 @@ Write failing test → Make it pass → Improve code
    - Added Status property to FileSearchCriteria in IFileRepository.cs
    - Uses Enum.TryParse for string-to-enum conversion (case-insensitive)
    - All 19 FileRepository tests passing
+13. **NEW:** FileUploadService Complete Test Coverage (commit 0467560)
+   - Added 3 missing tests: hash calculation exception, SaveChanges exception, large file size handling
+   - Tests exception handling during hash computation and database operations
+   - Validates 5GB file handling with proper provider selection
+   - All 10 FileUploadService tests passing (100% coverage)
+14. **NEW:** ChunkedUploadService Complete Test Coverage (commit 32c8f42)
+   - Added 6 missing tests: SaveChanges failure, validation tests, exception handling
+   - Tests: zero totalSize validation, empty filename validation, update failures
+   - Tests: hash calculation failure, file not found during complete
+   - All 13 ChunkedUploadService tests passing (100% coverage)
+15. **NEW:** FileRetrievalService Complete Test Coverage (commit 69ecbb7)
+   - Added 7 missing tests covering all service methods
+   - Tests: GetFileMetadataAsync (valid/invalid), GetUserFilesAsync pagination
+   - Tests: InitiateRetrievalAsync exception, CheckRetrievalStatusAsync exception
+   - Tests: DownloadFileAsync file not found, null retrievalId edge case
+   - All 13 FileRetrievalService tests passing (100% coverage)
 
 ### Architectural Findings
 - **Download API Design Issue:** Current `/download` endpoint handles both direct download (200 OK) and retrieval initiation (202 Accepted)
@@ -467,7 +483,7 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ✅ Should emit FileUploadCompleted event (via domain)
 - ⬜ Should queue thumbnail generation job asynchronously
 
-**Test Class:** `FileUploadServiceTests.cs` (8 tests passing)
+**Test Class:** `FileUploadServiceTests.cs` (10 tests passing - COMPLETE)
 **Dependencies:** IFileRepository, IStorageProvider, StorageProviderSelector, IHashService
 **Location:** `backend/tests/FlexStorage.Application.Tests/Services/FileUploadServiceTests.cs:14`
 
@@ -493,7 +509,7 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ✅ Should expire upload session after 24 hours (domain logic)
 - ⬜ Should cleanup expired sessions via background job
 
-**Test Class:** `ChunkedUploadServiceTests.cs` (8 tests passing)
+**Test Class:** `ChunkedUploadServiceTests.cs` (13 tests passing - COMPLETE)
 **Dependencies:** IUploadSessionRepository, IFileRepository, IHashService
 **Location:** `backend/tests/FlexStorage.Application.Tests/Services/ChunkedUploadServiceTests.cs:14`
 
@@ -516,7 +532,7 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ⬜ Should send webhook notification when retrieval ready
 - ✅ Should get user files with pagination
 
-**Test Class:** `FileRetrievalServiceTests.cs` (6 tests passing)
+**Test Class:** `FileRetrievalServiceTests.cs` (13 tests passing - COMPLETE)
 **Dependencies:** IFileRepository, IStorageService
 **Location:** `backend/tests/FlexStorage.Application.Tests/Services/FileRetrievalServiceTests.cs:14`
 
