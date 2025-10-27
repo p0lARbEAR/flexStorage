@@ -120,15 +120,29 @@ public class FilesController : ControllerBase
                 id = f.Id.Value,
                 fileName = f.Metadata.OriginalFileName,
                 size = f.Size.Bytes,
+                sizeFormatted = f.Size.ToHumanReadable(),
                 contentType = f.Type.MimeType,
+                capturedAt = f.Metadata.CapturedAt,
                 uploadedAt = f.Metadata.CreatedAt,
                 status = f.Status.CurrentState.ToString(),
-                userId = f.UserId.Value // Include user ID in response for debugging
+                storageProvider = f.Location?.ProviderName,
+                storagePath = f.Location?.Path,
+                // Client can use this to show icon: Deep Archive = needs retrieval
+                needsRetrieval = f.Location?.ProviderName == "s3-glacier-deep" ||
+                                 f.Location?.ProviderName == "s3-glacier-flexible",
+                retrievalTimeHours = f.Location?.ProviderName switch
+                {
+                    "s3-glacier-deep" => 12,  // 12-48 hours (show minimum)
+                    "s3-glacier-flexible" => 3, // 3-5 hours (show minimum)
+                    _ => 0
+                },
+                thumbnailUrl = (string?)null, // TODO: P1 feature - thumbnail generation
+                userId = f.UserId.Value
             }),
             page,
             pageSize,
             totalFiles = files.Count,
-            queriedUserId = actualUserId.Value // Show which user ID was used for the query
+            queriedUserId = actualUserId.Value
         });
     }
 
