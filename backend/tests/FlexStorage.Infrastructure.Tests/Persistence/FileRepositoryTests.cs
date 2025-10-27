@@ -440,6 +440,42 @@ public class FileRepositoryTests : IDisposable
         result.Items.Should().NotContain(f => f.Metadata.OriginalFileName == "work.pdf");
     }
 
+    [Fact]
+    public async Task SearchAsync_WithStatus_ShouldFilterByStatus()
+    {
+        // Arrange - RED: Test status filtering
+        var userId = UserId.New();
+
+        var file1 = CreateTestFile(userId: userId, fileName: "pending.jpg");
+        // file1 is Pending by default
+
+        var file2 = CreateTestFile(userId: userId, fileName: "completed.jpg");
+        file2.StartUpload();
+        file2.CompleteUpload(StorageLocation.Create("s3-glacier-deep", "s3://bucket/completed.jpg"));
+
+        var file3 = CreateTestFile(userId: userId, fileName: "archived.jpg");
+        file3.StartUpload();
+        file3.CompleteUpload(StorageLocation.Create("s3-glacier-deep", "s3://bucket/archived.jpg"));
+        file3.MarkAsArchived();
+
+        await _context.Files.AddRangeAsync(file1, file2, file3);
+        await _context.SaveChangesAsync();
+
+        var criteria = new FlexStorage.Application.Interfaces.Repositories.FileSearchCriteria
+        {
+            UserId = userId,
+            Status = "Completed"
+        };
+
+        // Act
+        var result = await _sut.SearchAsync(criteria);
+
+        // Assert - Should find only completed files
+        result.Items.Should().HaveCount(1);
+        result.Items[0].Metadata.OriginalFileName.Should().Be("completed.jpg");
+        result.Items[0].Status.CurrentState.Should().Be(UploadStatus.State.Completed);
+    }
+
     private File CreateTestFile(
         UserId? userId = null,
         string? hash = null,

@@ -82,6 +82,7 @@ public class FileSearchCriteria
     public DateTime? FromDate { get; init; }
     public DateTime? ToDate { get; init; }
     public List<string>? Tags { get; init; }
+    public string? Status { get; init; } // e.g., "Pending", "Uploading", "Completed", "Archived", "Failed"
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 50;
 }

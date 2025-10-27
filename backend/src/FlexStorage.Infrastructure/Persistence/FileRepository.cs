@@ -97,6 +97,14 @@ public class FileRepository : IFileRepository
             query = query.Where(f => f.Metadata.CapturedAt <= criteria.ToDate.Value);
         }
 
+        if (!string.IsNullOrWhiteSpace(criteria.Status))
+        {
+            if (Enum.TryParse<UploadStatus.State>(criteria.Status, ignoreCase: true, out var statusEnum))
+            {
+                query = query.Where(f => f.Status.CurrentState == statusEnum);
+            }
+        }
+
         // Order by captured date (newest first)
         query = query.OrderByDescending(f => f.Metadata.CapturedAt);
 
