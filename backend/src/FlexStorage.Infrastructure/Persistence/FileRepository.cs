@@ -100,14 +100,44 @@ public class FileRepository : IFileRepository
         // Order by captured date (newest first)
         query = query.OrderByDescending(f => f.Metadata.CapturedAt);
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        // Handle tags filtering with client-side evaluation (for InMemory compatibility)
+        IEnumerable<File> filteredItems;
+        int totalCount;
 
-        var items = await query
-            .Skip((criteria.Page - 1) * criteria.PageSize)
-            .Take(criteria.PageSize)
-            .ToListAsync(cancellationToken);
+        if (criteria.Tags != null && criteria.Tags.Any())
+        {
+            // Load all matching records first (before tag filtering)
+            var allItems = await query.ToListAsync(cancellationToken);
 
-        return new PagedResult<File>(items, totalCount, criteria.Page, criteria.PageSize);
+            // Normalize search tags for comparison
+            var normalizedSearchTags = criteria.Tags
+                .Select(t => t.Trim().ToLowerInvariant())
+                .ToHashSet();
+
+            // Filter files that have ANY of the specified tags (OR logic) - client-side
+            filteredItems = allItems
+                .Where(f => f.Metadata.Tags.Any(t => normalizedSearchTags.Contains(t)))
+                .ToList();
+
+            totalCount = filteredItems.Count();
+
+            // Apply pagination
+            filteredItems = filteredItems
+                .Skip((criteria.Page - 1) * criteria.PageSize)
+                .Take(criteria.PageSize);
+        }
+        else
+        {
+            // No tag filtering - execute query normally
+            totalCount = await query.CountAsync(cancellationToken);
+
+            filteredItems = await query
+                .Skip((criteria.Page - 1) * criteria.PageSize)
+                .Take(criteria.PageSize)
+                .ToListAsync(cancellationToken);
+        }
+
+        return new PagedResult<File>(filteredItems.ToList(), totalCount, criteria.Page, criteria.PageSize);
     }
 
     public async Task<File?> GetByHashAsync(string hash, CancellationToken cancellationToken = default)

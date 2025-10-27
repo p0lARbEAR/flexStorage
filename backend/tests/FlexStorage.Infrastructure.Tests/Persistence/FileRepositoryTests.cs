@@ -403,6 +403,43 @@ public class FileRepositoryTests : IDisposable
         result.TotalPages.Should().Be(0);
     }
 
+    [Fact]
+    public async Task SearchAsync_WithTags_ShouldFilterByTags()
+    {
+        // Arrange - RED: Test tag filtering
+        var userId = UserId.New();
+
+        var file1 = CreateTestFile(userId: userId, fileName: "vacation.jpg");
+        file1.Metadata.AddTag("vacation");
+        file1.Metadata.AddTag("beach");
+
+        var file2 = CreateTestFile(userId: userId, fileName: "work.pdf");
+        file2.Metadata.AddTag("work");
+        file2.Metadata.AddTag("important");
+
+        var file3 = CreateTestFile(userId: userId, fileName: "family.jpg");
+        file3.Metadata.AddTag("family");
+        file3.Metadata.AddTag("vacation");
+
+        await _context.Files.AddRangeAsync(file1, file2, file3);
+        await _context.SaveChangesAsync();
+
+        var criteria = new FlexStorage.Application.Interfaces.Repositories.FileSearchCriteria
+        {
+            UserId = userId,
+            Tags = new List<string> { "vacation" }
+        };
+
+        // Act
+        var result = await _sut.SearchAsync(criteria);
+
+        // Assert - Should find files with "vacation" tag
+        result.Items.Should().HaveCount(2);
+        result.Items.Should().Contain(f => f.Metadata.OriginalFileName == "vacation.jpg");
+        result.Items.Should().Contain(f => f.Metadata.OriginalFileName == "family.jpg");
+        result.Items.Should().NotContain(f => f.Metadata.OriginalFileName == "work.pdf");
+    }
+
     private File CreateTestFile(
         UserId? userId = null,
         string? hash = null,
