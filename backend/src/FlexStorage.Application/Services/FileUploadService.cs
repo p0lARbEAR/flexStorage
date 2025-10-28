@@ -117,22 +117,22 @@ public class FileUploadService : IFileUploadService
                     if (fileStream.CanSeek)
                         fileStream.Position = 0;
 
-                    // Generate thumbnail (200x200)
+                    // Generate thumbnail using configured defaults (300x300 WebP @ 80% quality)
                     using var thumbnailStream = await _thumbnailService.GenerateThumbnailAsync(
                         fileStream,
-                        width: 200,
-                        height: 200,
-                        cancellationToken);
+                        cancellationToken: cancellationToken);
 
                     // Upload thumbnail to S3 Standard storage
                     var thumbnailOptions = new UploadOptions
                     {
                         FileName = $"thumb_{metadata.SanitizedFileName}",
-                        ContentType = "image/jpeg", // Thumbnails are always JPEG
+                        ContentType = "image/webp", // Thumbnails are WebP for better compression
                         Metadata = new Dictionary<string, string>
                         {
                             { "original-file-id", file.Id.Value.ToString() },
-                            { "thumbnail-size", "200x200" }
+                            { "thumbnail-size", "300x300" },
+                            { "thumbnail-quality", "80" },
+                            { "thumbnail-format", "webp" }
                         }
                     };
 

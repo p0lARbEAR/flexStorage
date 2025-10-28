@@ -217,12 +217,12 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ✅ Plugin interface for custom providers (IStorageProvider defined + implemented)
 
 ### Feature Phase P1 - Essential Features ⬜
-**Status:** 15% Complete (Deduplication logic done, OAuth2/Thumbnails/Backblaze not started)
+**Status:** 25% Complete (Deduplication, thumbnails done; OAuth2/Backblaze not started)
 
 **Required Test Groups:**
 - ⬜ Group 11.1: AuthController (OAuth2)
 - ✅ Group 5.2: ChunkedUploadService (resumable uploads)
-- ⬜ Group 5.4: ThumbnailGenerationService
+- ✅ Group 5.4: ThumbnailService (WebP thumbnail generation)
 - ✅ Group 5.1: FileUploadService (hash-based deduplication)
 - ⬜ Group 5.5: HashComparisonService (batch hash API)
 - ⬜ Group 8.3: Backblaze B2 Provider
@@ -230,7 +230,7 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 **P1 Features Covered:**
 - ⬜ OAuth2 authentication
 - ✅ Chunked/resumable upload (application logic)
-- ⬜ Thumbnail generation & caching
+- ✅ Thumbnail generation (WebP 300×300 @ 80%, synchronous)
 - ✅ Hash-based deduplication (application logic)
 - ⬜ Batch hash comparison API
 - ⬜ Backblaze B2 provider
@@ -564,25 +564,25 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 
 ---
 
-### 5.4 ThumbnailGenerationService
-- ⬜ Should generate 3 thumbnail sizes for images (150, 300, 600)
-- ⬜ Should use WebP format for thumbnails
-- ⬜ Should maintain aspect ratio when resizing
-- ⬜ Should set quality to 85% by default
-- ⬜ Should generate thumbnails asynchronously via job queue
-- ⬜ Should store thumbnails in S3 Standard (not Glacier)
-- ⬜ Should use CDN for thumbnail delivery
-- ⬜ Should support lazy generation (on first request, then cache)
-- ⬜ Should generate 3 preview frames for videos (25%, 50%, 75%)
-- ⬜ Should generate 10-second preview clip for videos
-- ⬜ Should handle thumbnail generation failure gracefully
-- ⬜ Should skip thumbnail generation for unsupported types
-- ⬜ Should cache thumbnail URLs in file metadata
-- ⬜ Should return 202 if thumbnail still generating
-- ⬜ Should return cached thumbnail URL if available
+### 5.4 ThumbnailService (P1 Complete ✅)
+- ✅ Should generate WebP thumbnails (300×300 @ 80% quality by default)
+- ✅ Should use WebP format for better compression (25-35% smaller than JPEG)
+- ✅ Should maintain aspect ratio when resizing (ResizeMode.Max)
+- ✅ Should use configurable quality/dimensions (ThumbnailOptions)
+- ✅ Should generate thumbnails synchronously during upload
+- ✅ Should store thumbnails in S3 Standard (instant access, no retrieval)
+- ✅ Should handle thumbnail generation failure gracefully (main upload succeeds)
+- ✅ Should skip thumbnail generation for unsupported types (PDF, video, etc.)
+- ✅ Should support JPEG, PNG, GIF, BMP, WebP input formats
+- ✅ Should validate dimension ranges (1-5000 pixels)
+- ✅ Should validate quality range (1-100)
+- ⬜ Should generate 3 preview frames for videos (25%, 50%, 75%) - P2 feature
+- ⬜ Should generate 10-second preview clip for videos - P2 feature
+- ⬜ Should use CDN for thumbnail delivery - P2 feature
 
-**Test Class:** `ThumbnailGenerationServiceTests.cs`
-**Dependencies:** IFileRepository, IStorageProvider, Job Queue Interface
+**Test Class:** `ThumbnailServiceTests.cs` (8 tests), `S3StandardProviderTests.cs` (12 tests)
+**Dependencies:** SixLabors.ImageSharp 3.1.11, IStorageProvider (S3 Standard)
+**Configuration:** `appsettings.json` → `Thumbnail` section (Width, Height, Quality)
 
 ---
 

@@ -9,14 +9,16 @@ public interface IThumbnailService
     /// Generates a thumbnail from an image stream.
     /// </summary>
     /// <param name="imageStream">The source image stream</param>
-    /// <param name="width">Thumbnail width in pixels (default: 200)</param>
-    /// <param name="height">Thumbnail height in pixels (default: 200)</param>
+    /// <param name="width">Thumbnail width in pixels (null = use configured default)</param>
+    /// <param name="height">Thumbnail height in pixels (null = use configured default)</param>
+    /// <param name="quality">WebP quality 1-100 (null = use configured default)</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Stream containing the thumbnail image (JPEG format)</returns>
+    /// <returns>Stream containing the thumbnail image (WebP format)</returns>
     Task<Stream> GenerateThumbnailAsync(
         Stream imageStream,
-        int width = 200,
-        int height = 200,
+        int? width = null,
+        int? height = null,
+        int? quality = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

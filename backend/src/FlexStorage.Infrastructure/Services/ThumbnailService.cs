@@ -1,7 +1,9 @@
 using FlexStorage.Application.Interfaces.Services;
+using FlexStorage.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Webp;
 
 namespace FlexStorage.Infrastructure.Services;
 
@@ -10,6 +12,8 @@ namespace FlexStorage.Infrastructure.Services;
 /// </summary>
 public class ThumbnailService : IThumbnailService
 {
+    private readonly ThumbnailOptions _options;
+
     private static readonly HashSet<string> SupportedMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/jpeg",
@@ -20,22 +24,37 @@ public class ThumbnailService : IThumbnailService
         "image/webp"
     };
 
+    public ThumbnailService(IOptions<ThumbnailOptions> options)
+    {
+        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+    }
+
     /// <summary>
     /// Generates a thumbnail from an image stream.
+    /// Uses configured defaults from ThumbnailOptions (300×300 @ 80% quality).
     /// </summary>
     public async Task<Stream> GenerateThumbnailAsync(
         Stream imageStream,
-        int width = 200,
-        int height = 200,
+        int? width = null,
+        int? height = null,
+        int? quality = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(imageStream);
 
-        if (width <= 0 || width > 5000)
+        // Use configured defaults if parameters not provided
+        var actualWidth = width ?? _options.Width;
+        var actualHeight = height ?? _options.Height;
+        var actualQuality = quality ?? _options.Quality;
+
+        if (actualWidth <= 0 || actualWidth > 5000)
             throw new ArgumentException("Width must be between 1 and 5000", nameof(width));
 
-        if (height <= 0 || height > 5000)
+        if (actualHeight <= 0 || actualHeight > 5000)
             throw new ArgumentException("Height must be between 1 and 5000", nameof(height));
+
+        if (actualQuality <= 0 || actualQuality > 100)
+            throw new ArgumentException("Quality must be between 1 and 100", nameof(quality));
 
         // Reset stream position if seekable
         if (imageStream.CanSeek)
@@ -49,15 +68,16 @@ public class ThumbnailService : IThumbnailService
             // Resize to thumbnail dimensions (maintain aspect ratio)
             image.Mutate(x => x.Resize(new ResizeOptions
             {
-                Size = new Size(width, height),
+                Size = new Size(actualWidth, actualHeight),
                 Mode = ResizeMode.Max // Maintains aspect ratio, fits within bounds
             }));
 
-            // Save as JPEG to memory stream
+            // Save as WebP to memory stream (WebP @ 80% ≈ JPEG @ 85-90%)
             var outputStream = new MemoryStream();
-            await image.SaveAsync(outputStream, new JpegEncoder
+            await image.SaveAsync(outputStream, new WebpEncoder
             {
-                Quality = 85 // Good quality/size balance
+                Quality = actualQuality,
+                FileFormat = WebpFileFormatType.Lossy // Use lossy compression for smaller files
             }, cancellationToken);
 
             outputStream.Position = 0;

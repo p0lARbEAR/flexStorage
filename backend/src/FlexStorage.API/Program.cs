@@ -7,6 +7,7 @@ using FlexStorage.Application.Interfaces.Repositories;
 using FlexStorage.Application.Interfaces.Services;
 using FlexStorage.Application.Services;
 using FlexStorage.Domain.DomainServices;
+using FlexStorage.Infrastructure.Configuration;
 using FlexStorage.Infrastructure.Persistence;
 using FlexStorage.Infrastructure.Services;
 using FlexStorage.Infrastructure.Storage;
@@ -15,6 +16,10 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+
+// Configuration Options
+builder.Services.Configure<ThumbnailOptions>(
+    builder.Configuration.GetSection(ThumbnailOptions.SectionName));
 
 // AWS Services
 builder.Services.AddSingleton<IAmazonS3>(provider =>

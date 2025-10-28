@@ -1,5 +1,7 @@
 using FluentAssertions;
+using FlexStorage.Infrastructure.Configuration;
 using FlexStorage.Infrastructure.Services;
+using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -14,7 +16,13 @@ public class ThumbnailServiceTests
 
     public ThumbnailServiceTests()
     {
-        _sut = new ThumbnailService();
+        var options = Options.Create(new ThumbnailOptions
+        {
+            Width = 300,
+            Height = 300,
+            Quality = 80
+        });
+        _sut = new ThumbnailService(options);
     }
 
     [Fact]
@@ -24,8 +32,8 @@ public class ThumbnailServiceTests
         var imageBytes = CreateTestJpegImage();
         using var imageStream = new MemoryStream(imageBytes);
 
-        // Act
-        using var thumbnailStream = await _sut.GenerateThumbnailAsync(imageStream, 200, 200);
+        // Act - Use new defaults: 300x300 @ 80% quality
+        using var thumbnailStream = await _sut.GenerateThumbnailAsync(imageStream, 300, 300, 80);
 
         // Assert
         thumbnailStream.Should().NotBeNull();
@@ -40,8 +48,8 @@ public class ThumbnailServiceTests
         var imageBytes = CreateTestPngImage();
         using var imageStream = new MemoryStream(imageBytes);
 
-        // Act
-        using var thumbnailStream = await _sut.GenerateThumbnailAsync(imageStream, 200, 200);
+        // Act - Use new defaults: 300x300 @ 80% quality
+        using var thumbnailStream = await _sut.GenerateThumbnailAsync(imageStream, 300, 300, 80);
 
         // Assert
         thumbnailStream.Should().NotBeNull();
@@ -88,7 +96,7 @@ public class ThumbnailServiceTests
         using var invalidStream = new MemoryStream(invalidData);
 
         // Act
-        Func<Task> act = async () => await _sut.GenerateThumbnailAsync(invalidStream, 200, 200);
+        Func<Task> act = async () => await _sut.GenerateThumbnailAsync(invalidStream, 300, 300, 80);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -96,20 +104,23 @@ public class ThumbnailServiceTests
     }
 
     [Theory]
-    [InlineData(0, 200)]
-    [InlineData(-1, 200)]
-    [InlineData(5001, 200)]
-    [InlineData(200, 0)]
-    [InlineData(200, -1)]
-    [InlineData(200, 5001)]
-    public async Task GenerateThumbnailAsync_WithInvalidDimensions_ShouldThrowArgumentException(int width, int height)
+    [InlineData(0, 300, 80)]
+    [InlineData(-1, 300, 80)]
+    [InlineData(5001, 300, 80)]
+    [InlineData(300, 0, 80)]
+    [InlineData(300, -1, 80)]
+    [InlineData(300, 5001, 80)]
+    [InlineData(300, 300, 0)]
+    [InlineData(300, 300, -1)]
+    [InlineData(300, 300, 101)]
+    public async Task GenerateThumbnailAsync_WithInvalidParameters_ShouldThrowArgumentException(int width, int height, int quality)
     {
         // Arrange
         var imageBytes = CreateTestJpegImage();
         using var imageStream = new MemoryStream(imageBytes);
 
         // Act
-        Func<Task> act = async () => await _sut.GenerateThumbnailAsync(imageStream, width, height);
+        Func<Task> act = async () => await _sut.GenerateThumbnailAsync(imageStream, width, height, quality);
 
         // Assert
         await act.Should().ThrowAsync<ArgumentException>();
@@ -119,7 +130,7 @@ public class ThumbnailServiceTests
     public async Task GenerateThumbnailAsync_WithNullStream_ShouldThrowArgumentNullException()
     {
         // Act
-        Func<Task> act = async () => await _sut.GenerateThumbnailAsync(null!, 200, 200);
+        Func<Task> act = async () => await _sut.GenerateThumbnailAsync(null!, 300, 300, 80);
 
         // Assert
         await act.Should().ThrowAsync<ArgumentNullException>();
@@ -132,8 +143,8 @@ public class ThumbnailServiceTests
         var largeImageBytes = CreateTestJpegImage(1920, 1080);
         using var imageStream = new MemoryStream(largeImageBytes);
 
-        // Act
-        using var thumbnailStream = await _sut.GenerateThumbnailAsync(imageStream, 200, 200);
+        // Act - WebP @ 80% quality should produce smaller files than JPEG @ 85%
+        using var thumbnailStream = await _sut.GenerateThumbnailAsync(imageStream, 300, 300, 80);
 
         // Assert
         thumbnailStream.Should().NotBeNull();

@@ -70,10 +70,11 @@ public class FileUploadServiceTests
             .Returns(false);
         _thumbnailService.GenerateThumbnailAsync(
             Arg.Any<Stream>(),
-            Arg.Any<int>(),
-            Arg.Any<int>(),
+            Arg.Any<int?>(),
+            Arg.Any<int?>(),
+            Arg.Any<int?>(),
             Arg.Any<CancellationToken>())
-            .Returns(new MemoryStream(new byte[] { 0xFF, 0xD8, 0xFF })); // JPEG header
+            .Returns(new MemoryStream(new byte[] { 0xFF, 0xD8, 0xFF })); // WebP-like header
 
         _unitOfWork.Files.Returns(_fileRepository);
 
@@ -481,17 +482,18 @@ public class FileUploadServiceTests
         result.Should().NotBeNull();
         result.Success.Should().BeTrue();
 
-        // Verify thumbnail was generated and uploaded
+        // Verify thumbnail was generated and uploaded (uses configured defaults)
         await _thumbnailService.Received(1).GenerateThumbnailAsync(
             Arg.Any<Stream>(),
-            200,
-            200,
+            null, // Uses configured default width
+            null, // Uses configured default height
+            null, // Uses configured default quality
             Arg.Any<CancellationToken>());
 
         await _thumbnailStorageProvider.Received(1).UploadAsync(
             Arg.Any<Stream>(),
             Arg.Is<UploadOptions>(opts =>
-                opts.ContentType == "image/jpeg" &&
+                opts.ContentType == "image/webp" &&
                 opts.FileName!.StartsWith("thumb_")),
             Arg.Any<CancellationToken>());
 
@@ -543,8 +545,9 @@ public class FileUploadServiceTests
         // Verify thumbnail was NOT generated
         await _thumbnailService.DidNotReceive().GenerateThumbnailAsync(
             Arg.Any<Stream>(),
-            Arg.Any<int>(),
-            Arg.Any<int>(),
+            Arg.Any<int?>(),
+            Arg.Any<int?>(),
+            Arg.Any<int?>(),
             Arg.Any<CancellationToken>());
 
         await _thumbnailStorageProvider.DidNotReceive().UploadAsync(
@@ -587,8 +590,9 @@ public class FileUploadServiceTests
         // Make thumbnail generation throw exception
         _thumbnailService.GenerateThumbnailAsync(
             Arg.Any<Stream>(),
-            Arg.Any<int>(),
-            Arg.Any<int>(),
+            Arg.Any<int?>(),
+            Arg.Any<int?>(),
+            Arg.Any<int?>(),
             Arg.Any<CancellationToken>())
             .Returns<Stream>(x => throw new InvalidOperationException("Thumbnail generation failed"));
 
