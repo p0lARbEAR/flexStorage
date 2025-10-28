@@ -102,11 +102,13 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 // Infrastructure Services
 builder.Services.AddScoped<IHashService, HashService>();
 builder.Services.AddScoped<IStorageService, StorageService>();
+builder.Services.AddScoped<IThumbnailService, ThumbnailService>();
 
 // Storage Providers
 var deepArchiveBucket =
     builder.Configuration.GetValue<string>("AWS:S3:DeepArchiveBucket") ?? "flexstorage-deep-archive";
 var flexibleBucket = builder.Configuration.GetValue<string>("AWS:S3:FlexibleBucket") ?? "flexstorage-flexible";
+var thumbnailBucket = builder.Configuration.GetValue<string>("AWS:S3:ThumbnailBucket") ?? "flexstorage-thumbnails";
 
 builder.Services.AddScoped<IStorageProvider>(sp =>
 {
@@ -123,12 +125,23 @@ builder.Services.AddKeyedScoped<IStorageProvider>("s3-glacier-deep", (sp, _) =>
 builder.Services.AddKeyedScoped<IStorageProvider>("s3-glacier-flexible", (sp, _) =>
     new S3GlacierFlexibleRetrievalProvider(sp.GetRequiredService<IAmazonS3>(), flexibleBucket));
 
+// S3 Standard for thumbnails (instant access, no retrieval needed)
+builder.Services.AddKeyedScoped<IStorageProvider>("s3-standard", (sp, _) =>
+    new S3StandardProvider(sp.GetRequiredService<IAmazonS3>(), thumbnailBucket));
+
 // Domain Services
 builder.Services.AddScoped<StorageProviderSelector>();
 
 // Application Services
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
-builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<IFileUploadService>(sp => new FileUploadService(
+    sp.GetRequiredService<IUnitOfWork>(),
+    sp.GetRequiredService<IHashService>(),
+    sp.GetRequiredService<IStorageService>(),
+    sp.GetRequiredService<StorageProviderSelector>(),
+    sp.GetRequiredService<IThumbnailService>(),
+    sp.GetRequiredKeyedService<IStorageProvider>("s3-standard") // Inject thumbnail storage provider
+));
 builder.Services.AddScoped<IChunkedUploadService, ChunkedUploadService>();
 builder.Services.AddScoped<IFileRetrievalService, FileRetrievalService>();
 

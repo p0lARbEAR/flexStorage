@@ -17,17 +17,23 @@ public class FileUploadService : IFileUploadService
     private readonly IHashService _hashService;
     private readonly IStorageService _storageService;
     private readonly StorageProviderSelector _providerSelector;
+    private readonly IThumbnailService _thumbnailService;
+    private readonly IStorageProvider _thumbnailStorageProvider;
 
     public FileUploadService(
         IUnitOfWork unitOfWork,
         IHashService hashService,
         IStorageService storageService,
-        StorageProviderSelector providerSelector)
+        StorageProviderSelector providerSelector,
+        IThumbnailService thumbnailService,
+        IStorageProvider thumbnailStorageProvider)
     {
         _unitOfWork = unitOfWork;
         _hashService = hashService;
         _storageService = storageService;
         _providerSelector = providerSelector;
+        _thumbnailService = thumbnailService;
+        _thumbnailStorageProvider = thumbnailStorageProvider;
     }
 
     /// <summary>
@@ -101,6 +107,52 @@ public class FileUploadService : IFileUploadService
 
             // Complete upload in domain
             file.CompleteUpload(uploadResult.Location!);
+
+            // Generate and upload thumbnail if it's an image
+            if (_thumbnailService.IsThumbnailSupported(mimeType))
+            {
+                try
+                {
+                    // Reset stream for thumbnail generation
+                    if (fileStream.CanSeek)
+                        fileStream.Position = 0;
+
+                    // Generate thumbnail (200x200)
+                    using var thumbnailStream = await _thumbnailService.GenerateThumbnailAsync(
+                        fileStream,
+                        width: 200,
+                        height: 200,
+                        cancellationToken);
+
+                    // Upload thumbnail to S3 Standard storage
+                    var thumbnailOptions = new UploadOptions
+                    {
+                        FileName = $"thumb_{metadata.SanitizedFileName}",
+                        ContentType = "image/jpeg", // Thumbnails are always JPEG
+                        Metadata = new Dictionary<string, string>
+                        {
+                            { "original-file-id", file.Id.Value.ToString() },
+                            { "thumbnail-size", "200x200" }
+                        }
+                    };
+
+                    var thumbnailResult = await _thumbnailStorageProvider.UploadAsync(
+                        thumbnailStream,
+                        thumbnailOptions,
+                        cancellationToken);
+
+                    if (thumbnailResult.Success)
+                    {
+                        file.SetThumbnail(thumbnailResult.Location!);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't fail the main upload
+                    // Thumbnails are optional
+                    Console.WriteLine($"Thumbnail generation failed: {ex.Message}");
+                }
+            }
 
             // Save to repository
             await _unitOfWork.Files.AddAsync(file, cancellationToken);

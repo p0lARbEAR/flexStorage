@@ -104,6 +104,18 @@ public class FlexStorageDbContext : DbContext
                     .HasMaxLength(500);
             });
 
+            // ThumbnailLocation value object
+            entity.OwnsOne(e => e.ThumbnailLocation, thumbnail =>
+            {
+                thumbnail.Property(l => l.ProviderName)
+                    .HasColumnName("ThumbnailProvider")
+                    .HasMaxLength(50);
+
+                thumbnail.Property(l => l.Path)
+                    .HasColumnName("ThumbnailPath")
+                    .HasMaxLength(500);
+            });
+
             // FileMetadata owned entity
             entity.OwnsOne(e => e.Metadata, metadata =>
             {

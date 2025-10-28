@@ -136,7 +136,7 @@ public class FilesController : ControllerBase
                     "s3-glacier-flexible" => 3, // 3-5 hours (show minimum)
                     _ => 0
                 },
-                thumbnailUrl = (string?)null, // TODO: P1 feature - thumbnail generation
+                thumbnailUrl = f.ThumbnailLocation?.Path, // S3 path to thumbnail in Standard storage
                 userId = f.UserId.Value
             }),
             page,

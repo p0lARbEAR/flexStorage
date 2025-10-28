@@ -43,6 +43,12 @@ public class File : Entity<FileId>, IAggregateRoot
     public StorageLocation? Location { get; private set; }
 
     /// <summary>
+    /// Gets the thumbnail storage location (null if no thumbnail generated).
+    /// Thumbnails are stored in S3 Standard for instant access.
+    /// </summary>
+    public StorageLocation? ThumbnailLocation { get; private set; }
+
+    /// <summary>
     /// Gets the upload progress percentage (0-100).
     /// </summary>
     public int UploadProgress { get; private set; }
@@ -135,6 +141,15 @@ public class File : Entity<FileId>, IAggregateRoot
         UploadProgress = 100;
 
         RaiseDomainEvent(new FileUploadCompletedDomainEvent(Id, location));
+    }
+
+    /// <summary>
+    /// Sets the thumbnail storage location.
+    /// </summary>
+    /// <param name="thumbnailLocation">Where the thumbnail was stored</param>
+    public void SetThumbnail(StorageLocation thumbnailLocation)
+    {
+        ThumbnailLocation = thumbnailLocation ?? throw new ArgumentNullException(nameof(thumbnailLocation));
     }
 
     /// <summary>
