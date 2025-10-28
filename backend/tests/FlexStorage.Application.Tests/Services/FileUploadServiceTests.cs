@@ -19,6 +19,8 @@ public class FileUploadServiceTests
     private readonly IHashService _hashService;
     private readonly IStorageService _storageService;
     private readonly StorageProviderSelector _providerSelector;
+    private readonly IThumbnailService _thumbnailService;
+    private readonly IStorageProvider _thumbnailStorageProvider;
     private readonly FileUploadService _sut;
 
     public FileUploadServiceTests()
@@ -27,6 +29,8 @@ public class FileUploadServiceTests
         _fileRepository = Substitute.For<IFileRepository>();
         _hashService = Substitute.For<IHashService>();
         _storageService = Substitute.For<IStorageService>();
+        _thumbnailService = Substitute.For<IThumbnailService>();
+        _thumbnailStorageProvider = Substitute.For<IStorageProvider>();
 
         // Setup mock storage providers for selector
         var deepArchiveProvider = Substitute.For<IStorageProvider>();
@@ -47,13 +51,39 @@ public class FileUploadServiceTests
 
         _providerSelector = new StorageProviderSelector(new[] { deepArchiveProvider, flexibleProvider });
 
+        // Setup thumbnail storage provider
+        _thumbnailStorageProvider.ProviderName.Returns("s3-standard");
+        _thumbnailStorageProvider.UploadAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<UploadOptions>(),
+            Arg.Any<CancellationToken>())
+            .Returns(new UploadResult
+            {
+                Success = true,
+                Location = StorageLocation.Create("s3-standard", "s3://thumbnails/thumb.jpg")
+            });
+
+        // Setup thumbnail service - by default, support images and return a thumbnail stream
+        _thumbnailService.IsThumbnailSupported(Arg.Is<string>(m => m.StartsWith("image/")))
+            .Returns(true);
+        _thumbnailService.IsThumbnailSupported(Arg.Is<string>(m => !m.StartsWith("image/")))
+            .Returns(false);
+        _thumbnailService.GenerateThumbnailAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<int>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>())
+            .Returns(new MemoryStream(new byte[] { 0xFF, 0xD8, 0xFF })); // JPEG header
+
         _unitOfWork.Files.Returns(_fileRepository);
 
         _sut = new FileUploadService(
             _unitOfWork,
             _hashService,
             _storageService,
-            _providerSelector);
+            _providerSelector,
+            _thumbnailService,
+            _thumbnailStorageProvider);
     }
 
     [Fact]
@@ -408,6 +438,175 @@ public class FileUploadServiceTests
         result.FileId.Should().NotBeNull();
 
         // Verify large file was processed
+        await _fileRepository.Received(1).AddAsync(Arg.Any<File>(), Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UploadAsync_WithImageFile_ShouldGenerateThumbnail()
+    {
+        // Arrange
+        var userId = UserId.New();
+        var fileStream = new MemoryStream(new byte[] { 1, 2, 3 });
+        var fileName = "test.jpg";
+        var mimeType = "image/jpeg";
+        var capturedAt = DateTime.UtcNow;
+        var expectedHash = "sha256:abc123";
+
+        _hashService.CalculateSha256Async(fileStream, Arg.Any<CancellationToken>())
+            .Returns(expectedHash);
+
+        _fileRepository.GetByHashAsync(expectedHash, Arg.Any<CancellationToken>())
+            .Returns((File?)null);
+
+        File? savedFile = null;
+        await _fileRepository.AddAsync(
+            Arg.Do<File>(x => savedFile = x),
+            Arg.Any<CancellationToken>());
+
+        _storageService.UploadAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<UploadOptions>(),
+            Arg.Any<CancellationToken>())
+            .Returns(new UploadResult
+            {
+                Location = StorageLocation.Create("s3-glacier-deep", "s3://bucket/path"),
+                Success = true
+            });
+
+        // Act
+        var result = await _sut.UploadAsync(userId, fileStream, fileName, mimeType, capturedAt);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeTrue();
+
+        // Verify thumbnail was generated and uploaded
+        await _thumbnailService.Received(1).GenerateThumbnailAsync(
+            Arg.Any<Stream>(),
+            200,
+            200,
+            Arg.Any<CancellationToken>());
+
+        await _thumbnailStorageProvider.Received(1).UploadAsync(
+            Arg.Any<Stream>(),
+            Arg.Is<UploadOptions>(opts =>
+                opts.ContentType == "image/jpeg" &&
+                opts.FileName!.StartsWith("thumb_")),
+            Arg.Any<CancellationToken>());
+
+        // Verify file has thumbnail location set
+        savedFile.Should().NotBeNull();
+        savedFile!.ThumbnailLocation.Should().NotBeNull();
+        savedFile.ThumbnailLocation!.ProviderName.Should().Be("s3-standard");
+    }
+
+    [Fact]
+    public async Task UploadAsync_WithNonImageFile_ShouldNotGenerateThumbnail()
+    {
+        // Arrange
+        var userId = UserId.New();
+        var fileStream = new MemoryStream(new byte[] { 1, 2, 3 });
+        var fileName = "document.pdf";
+        var mimeType = "application/pdf";
+        var capturedAt = DateTime.UtcNow;
+        var expectedHash = "sha256:abc123";
+
+        _hashService.CalculateSha256Async(fileStream, Arg.Any<CancellationToken>())
+            .Returns(expectedHash);
+
+        _fileRepository.GetByHashAsync(expectedHash, Arg.Any<CancellationToken>())
+            .Returns((File?)null);
+
+        File? savedFile = null;
+        await _fileRepository.AddAsync(
+            Arg.Do<File>(x => savedFile = x),
+            Arg.Any<CancellationToken>());
+
+        _storageService.UploadAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<UploadOptions>(),
+            Arg.Any<CancellationToken>())
+            .Returns(new UploadResult
+            {
+                Location = StorageLocation.Create("s3-glacier-deep", "s3://bucket/path"),
+                Success = true
+            });
+
+        // Act
+        var result = await _sut.UploadAsync(userId, fileStream, fileName, mimeType, capturedAt);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeTrue();
+
+        // Verify thumbnail was NOT generated
+        await _thumbnailService.DidNotReceive().GenerateThumbnailAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<int>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+
+        await _thumbnailStorageProvider.DidNotReceive().UploadAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<UploadOptions>(),
+            Arg.Any<CancellationToken>());
+
+        // Verify file has no thumbnail location
+        savedFile.Should().NotBeNull();
+        savedFile!.ThumbnailLocation.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UploadAsync_WhenThumbnailGenerationFails_ShouldStillSucceed()
+    {
+        // Arrange - Thumbnail generation should not fail the main upload
+        var userId = UserId.New();
+        var fileStream = new MemoryStream(new byte[] { 1, 2, 3 });
+        var fileName = "test.jpg";
+        var mimeType = "image/jpeg";
+        var capturedAt = DateTime.UtcNow;
+        var expectedHash = "sha256:abc123";
+
+        _hashService.CalculateSha256Async(fileStream, Arg.Any<CancellationToken>())
+            .Returns(expectedHash);
+
+        _fileRepository.GetByHashAsync(expectedHash, Arg.Any<CancellationToken>())
+            .Returns((File?)null);
+
+        _storageService.UploadAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<UploadOptions>(),
+            Arg.Any<CancellationToken>())
+            .Returns(new UploadResult
+            {
+                Location = StorageLocation.Create("s3-glacier-deep", "s3://bucket/path"),
+                Success = true
+            });
+
+        // Make thumbnail generation throw exception
+        _thumbnailService.GenerateThumbnailAsync(
+            Arg.Any<Stream>(),
+            Arg.Any<int>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>())
+            .Returns<Stream>(x => throw new InvalidOperationException("Thumbnail generation failed"));
+
+        File? savedFile = null;
+        await _fileRepository.AddAsync(
+            Arg.Do<File>(x => savedFile = x),
+            Arg.Any<CancellationToken>());
+
+        // Act
+        var result = await _sut.UploadAsync(userId, fileStream, fileName, mimeType, capturedAt);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeTrue(); // Main upload should still succeed
+
+        // Verify file was still saved (without thumbnail)
+        savedFile.Should().NotBeNull();
+        savedFile!.ThumbnailLocation.Should().BeNull();
         await _fileRepository.Received(1).AddAsync(Arg.Any<File>(), Arg.Any<CancellationToken>());
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
