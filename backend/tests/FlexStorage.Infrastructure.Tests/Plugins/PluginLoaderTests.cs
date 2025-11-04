@@ -89,9 +89,9 @@ public class PluginLoaderTests : IDisposable
     }
 
     [Fact]
-    public void LoadPlugin_WithValidPluginInfo_ShouldReturnProviderInstance()
+    public void LoadPlugin_WithNonExistentAssembly_ShouldThrowFileNotFoundException()
     {
-        // Arrange - RED: Test loading plugin and instantiating provider
+        // Arrange - Test that non-existent assembly paths throw appropriate exception
         var pluginInfo = new PluginInfo
         {
             Name = "TestProvider",
@@ -100,10 +100,39 @@ public class PluginLoaderTests : IDisposable
             ProviderTypeName = "TestNamespace.TestProvider"
         };
 
-        // Act & Assert - Will implement in GREEN phase
-        // For now, verify method signature exists
+        // Act
         Action act = () => _sut.LoadPlugin(pluginInfo);
-        act.Should().NotThrow();
+
+        // Assert - Should throw FileNotFoundException for non-existent assembly
+        act.Should().Throw<FileNotFoundException>()
+            .WithMessage("*test.dll*");
+    }
+
+    [Fact]
+    public void LoadPlugin_WithValidPlugin_ShouldReturnProviderInstance()
+    {
+        // Arrange - Test loading a real plugin DLL
+        var testPluginPath = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory,
+            "FlexStorage.TestPlugin.dll");
+
+        var pluginInfo = new PluginInfo
+        {
+            Name = "TestStorageProvider",
+            Version = "1.0.0",
+            AssemblyPath = testPluginPath,
+            ProviderTypeName = "FlexStorage.TestPlugin.TestStorageProvider"
+        };
+
+        // Act
+        var provider = _sut.LoadPlugin(pluginInfo);
+
+        // Assert
+        provider.Should().NotBeNull();
+        provider.Should().BeAssignableTo<IStorageProvider>();
+        provider.ProviderName.Should().Be("test-storage");
+        provider.Capabilities.Should().NotBeNull();
+        provider.Capabilities.SupportsInstantAccess.Should().BeTrue();
     }
 
     [Fact]
@@ -159,17 +188,22 @@ public class PluginLoaderTests : IDisposable
     [Fact]
     public void LoadPlugin_WithDuplicateProvider_ShouldPreventLoading()
     {
-        // Arrange - RED: Test preventing duplicate providers
+        // Arrange - Test preventing duplicate providers
+        var testPluginPath = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory,
+            "FlexStorage.TestPlugin.dll");
+
         var pluginInfo = new PluginInfo
         {
-            Name = "DuplicateProvider",
+            Name = "TestStorageProvider",
             Version = "1.0.0",
-            AssemblyPath = "/path/to/duplicate.dll",
-            ProviderTypeName = "Test.DuplicateProvider"
+            AssemblyPath = testPluginPath,
+            ProviderTypeName = "FlexStorage.TestPlugin.TestStorageProvider"
         };
 
         // Act - Load once
-        _sut.LoadPlugin(pluginInfo);
+        var provider = _sut.LoadPlugin(pluginInfo);
+        provider.Should().NotBeNull();
 
         // Try to load again
         Action act = () => _sut.LoadPlugin(pluginInfo);
