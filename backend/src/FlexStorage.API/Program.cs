@@ -137,6 +137,43 @@ builder.Services.AddKeyedScoped<IStorageProvider>("s3-glacier-flexible", (sp, _)
 builder.Services.AddKeyedScoped<IStorageProvider>("s3-standard", (sp, _) =>
     new S3StandardProvider(sp.GetRequiredService<IAmazonS3>(), thumbnailBucket));
 
+// iDrive e2 S3-compatible storage (instant access, 3x free egress)
+var idriveEnabled = builder.Configuration.GetValue<bool>("IDriveE2:Enabled", false);
+if (idriveEnabled)
+{
+    builder.Services.AddKeyedScoped<IStorageProvider>("idrive-e2", (sp, _) =>
+    {
+        var config = builder.Configuration;
+        var endpoint = config.GetValue<string>("IDriveE2:Endpoint") ?? "https://s3.us-east-1.idrivee2.com";
+        var region = config.GetValue<string>("IDriveE2:Region") ?? "us-east-1";
+        var bucket = config.GetValue<string>("IDriveE2:Bucket") ?? "flexstorage-idrive-dev";
+        var accessKey = config.GetValue<string>("IDriveE2:AccessKey");
+        var secretKey = config.GetValue<string>("IDriveE2:SecretKey");
+
+        // Create dedicated S3 client for iDrive e2
+        var s3Config = new Amazon.S3.AmazonS3Config
+        {
+            ServiceURL = endpoint,
+            ForcePathStyle = true, // Required for S3-compatible services
+            AuthenticationRegion = region
+        };
+
+        IAmazonS3 idriveClient;
+        if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
+        {
+            var credentials = new Amazon.Runtime.BasicAWSCredentials(accessKey, secretKey);
+            idriveClient = new Amazon.S3.AmazonS3Client(credentials, s3Config);
+        }
+        else
+        {
+            // Fall back to default credentials
+            idriveClient = new Amazon.S3.AmazonS3Client(s3Config);
+        }
+
+        return new IDriveE2Provider(idriveClient, bucket);
+    });
+}
+
 // Domain Services
 builder.Services.AddScoped<StorageProviderSelector>();
 

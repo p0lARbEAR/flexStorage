@@ -808,7 +808,30 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 
 ---
 
-### 8.3 BackblazeB2Provider
+### 8.3 IDriveE2Provider ✅ COMPLETE (14 tests)
+- ✅ Should return correct provider name (`idrive-e2`)
+- ✅ Should have instant access capabilities (no retrieval)
+- ✅ Should upload file to iDrive e2 with S3 SDK
+- ✅ Should include metadata in upload request
+- ✅ Should return failure result on upload exception
+- ✅ Should download file from iDrive e2
+- ✅ Should throw InvalidOperationException on download failure
+- ✅ Should delete file from iDrive e2
+- ✅ Should return false on delete exception
+- ✅ Should throw NotSupportedException for retrieval (instant access)
+- ✅ Should throw NotSupportedException for retrieval status
+- ✅ Should return healthy status when bucket accessible
+- ✅ Should return unhealthy status on connection failure
+- ✅ Should generate S3 keys with date path and unique ID
+
+**Test Class:** `IDriveE2ProviderTests.cs` (14 tests passing)
+**Dependencies:** AWS SDK S3 (mock), iDrive e2 S3-compatible endpoint
+**Pricing:** $4/TB/month with 3x free egress - most cost-effective for photo/video storage
+**Configuration:** `appsettings.json` → `IDriveE2` section (Endpoint, Bucket, Region, AccessKey, SecretKey)
+
+---
+
+### 8.4 BackblazeB2Provider
 - ⬜ Should authenticate with Backblaze API
 - ⬜ Should cache authentication token
 - ⬜ Should refresh token when expired
