@@ -18,6 +18,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 // Configuration Options
+builder.Services.Configure<UploadLimitsOptions>(
+    builder.Configuration.GetSection(UploadLimitsOptions.SectionName));
+
 builder.Services.Configure<ThumbnailOptions>(
     builder.Configuration.GetSection(ThumbnailOptions.SectionName));
 
@@ -149,6 +152,23 @@ builder.Services.AddScoped<IFileUploadService>(sp => new FileUploadService(
 ));
 builder.Services.AddScoped<IChunkedUploadService, ChunkedUploadService>();
 builder.Services.AddScoped<IFileRetrievalService, FileRetrievalService>();
+
+// Configure request size limits from UploadLimitsOptions
+var maxUploadSize = builder.Configuration.GetValue<long>("UploadLimits:MaxFileSizeBytes", 20_971_520);
+
+// Configure Kestrel server limits
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>
+{
+    options.Limits.MaxRequestBodySize = maxUploadSize;
+});
+
+// Configure form options for multipart uploads
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = maxUploadSize;
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartHeadersLengthLimit = int.MaxValue;
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

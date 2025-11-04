@@ -978,7 +978,7 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 - ⬜ Should accept multipart form upload
 - ⬜ Should return 201 Created with file ID
 - ⬜ Should validate Content-Type header
-- ⬜ Should validate file size against user tier limit
+- ⬜ Should validate file size against configured limit (20 MB default)
 - ⬜ Should return 413 Payload Too Large if size exceeded
 - ⬜ Should validate file type
 - ⬜ Should return 400 Bad Request for invalid file type
@@ -992,6 +992,8 @@ This section maps **Test Group** completion to actual **Feature Phases** from BA
 
 **Test Class:** `FilesControllerUploadTests.cs`
 **Dependencies:** FileUploadService
+**Configuration:** `appsettings.json` → `UploadLimits` section (MaxFileSizeBytes: 20971520, MaxFileSizeMB: 20)
+**Note:** Single-request upload supports files up to 20 MB. Files >20 MB must use chunked upload.
 
 ---
 

@@ -56,11 +56,11 @@ This API is designed to work seamlessly with AI coding assistants (Claude, ChatG
 └──────┬──────┘
        │ HTTPS
        ↓
-┌─────────────────────────────────────┐
-│        FlexStorage API              │
-│  ┌──────────┐  ┌──────────────┐   │
-│  │   Auth   │  │ File Upload  │   │
-│  └──────────┘  └──────────────┘   │
+┌────────────────────────────────────┐
+│        FlexStorage API             │
+│  ┌──────────┐  ┌──────────────┐    │
+│  │   Auth   │  │ File Upload  │    │
+│  └──────────┘  └──────────────┘    │
 └──────┬──────────────────┬──────────┘
        │                  │
        ↓                  ↓
@@ -135,9 +135,9 @@ OAuth2 authentication flow (not yet implemented):
 
 ## Core Workflows
 
-### 1. Upload Small File (<5MB)
+### 1. Upload Small File (<20MB)
 
-**Single request upload for small files:**
+**Single request upload for small files (photos, documents):**
 
 ```http
 POST /api/v1/Files/upload
@@ -170,7 +170,7 @@ capturedAt: 2025-01-15T10:30:00Z (optional)
 
 ---
 
-### 2. Upload Large File (>5MB) - Chunked
+### 2. Upload Large File (>20MB) - Chunked
 
 **Step 1: Initialize chunked upload**
 
@@ -497,8 +497,8 @@ Photo Gallery
 ### 4. **Chunked Upload for Large Files**
 
 Use chunked upload for:
-- ✅ Files > 5MB
-- ✅ Videos
+- ✅ Files > 20MB
+- ✅ Large videos
 - ✅ Poor network conditions (resumable!)
 
 ### 5. **Retry Strategy**

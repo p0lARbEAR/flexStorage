@@ -1,3 +1,4 @@
+using FlexStorage.API.Constants;
 using FlexStorage.API.Models.Requests;
 using FlexStorage.Application.Interfaces.Services;
 using FlexStorage.Domain.DomainServices;
@@ -192,6 +193,7 @@ public class FilesController : ControllerBase
 
     [HttpPost]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(UploadConstants.MaxFileSizeBytes)] // 20 MB limit for single-request uploads
     public async Task<IActionResult> UploadFile([FromForm] UploadFileRequest request, CancellationToken cancellationToken)
     {
         if (request.File is null || request.File.Length == 0)
